@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from .events import InteractionEvent
 
@@ -47,13 +48,15 @@ class FusionEngine:
     def clear_selection(self) -> None:
         self._selection = None
 
-    def activate_direct(self, control_id: str, source: str, timestamp_ms: int) -> InteractionEvent:
-        """Emit a normal activation for a control that is already unambiguous.
-
-        This is used by the two-button fallback while the USB camera is absent.
-        Keeping it in the fusion engine preserves one event sequence and the same
-        public event contract for vision, buttons and future sensors.
-        """
+    def activate(
+        self,
+        control_id: str,
+        source: str,
+        timestamp_ms: int,
+        confidence: float = 1.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> InteractionEvent:
+        """Emit an activation from an already-resolved input source."""
         self._sequence += 1
         return InteractionEvent(
             sequence=self._sequence,
@@ -62,7 +65,21 @@ class FusionEngine:
             control_id=control_id,
             value=1,
             timestamp_ms=timestamp_ms,
-            confidence=1.0,
+            confidence=max(0.0, min(1.0, confidence)),
+            metadata=metadata or {},
+        )
+
+    def activate_direct(self, control_id: str, source: str, timestamp_ms: int) -> InteractionEvent:
+        """Emit a normal activation for a control that is already unambiguous.
+
+        This is used by the two-button fallback while the USB camera is absent.
+        Keeping it in the fusion engine preserves one event sequence and the same
+        public event contract for vision, buttons and future sensors.
+        """
+        return self.activate(
+            control_id=control_id,
+            source=source,
+            timestamp_ms=timestamp_ms,
             metadata={"input_mode": "direct_buttons"},
         )
 

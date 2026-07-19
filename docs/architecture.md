@@ -5,7 +5,7 @@ The Mac is a capture adapter; all interaction processing remains on the UNO Q:
 ```text
 Logitech C270 → Mac AVFoundation → JPEG POST → ADB tunnel ─────┐
                                                                ▼
-UNO Q Debian: latest-frame inbox → decode → detector → selection ─┐
+UNO Q Debian: latest-frame inbox → decode → zone rising edges ───┐
                                                                  ├→ Fusion → surfaceos.event.v1
 UNO Q STM32: D2/D3 → debounce → RouterBridge event ──────────────┘
       ▲                                                          │
@@ -14,21 +14,22 @@ UNO Q STM32: D2/D3 → debounce → RouterBridge event ────────�
 
 The Mac never decides what a frame means. It opens video only, resizes to 640×480, JPEG-encodes at a fixed rate and sends frames. The UNO Q owns calibration, foreground detection, zone state, event sequencing, web rendering and physical feedback.
 
-The frame inbox is a single atomic slot shared by the WebUI thread and app loop. A new upload replaces an unprocessed older frame, so latency stays bounded even when the sender is faster than the detector. If valid decoded frames stop for 1.2 seconds, visual selection is cleared and the two buttons fall back to direct actions.
+The frame inbox is a single atomic slot shared by the WebUI thread and app loop. A new upload replaces an unprocessed older frame, so latency stays bounded even when the sender is faster than the detector. If valid decoded frames stop for 1.2 seconds, active visual zones are cleared and the two buttons fall back to C4 and kick.
 
 ## Current interaction state machine
 
 ```text
 CLEAR
-  → foreground crosses press threshold for 3 frames
-CANDIDATE
-  → remains selected for 180 ms
-ARMED
-  → D2 press while latest observation is under 350 ms old
-ACTIVATE
+  → foreground crosses the press threshold
+OCCUPIED
+  → emit one activation on the rising edge
+HELD
+  → no repeats while the hand remains inside
+  → foreground falls below the release threshold for 2 frames
+CLEAR
 ```
 
-If both zones are occupied, confirmation fails closed. Release uses a lower occupancy threshold and more frames than press, preventing boundary flicker.
+Each of the ten zones has its own gate, so piano chords and simultaneous drums work. Release uses a lower occupancy threshold and more frames than press, preventing boundary flicker.
 
 ## Why background subtraction first
 
@@ -41,7 +42,7 @@ The detector is intentionally replaceable. Later input adapters can provide:
 - Hall-key authorization;
 - Movement-sensor impact timing.
 
-All confirmation sources call the same `FusionEngine.confirm(...)`, so outputs and agent integrations never depend on the sensor implementation.
+All resolved inputs emit through the same `FusionEngine.activate(...)`, so outputs and agent integrations never depend on the sensor implementation.
 
 ## Movement-sensor extension
 

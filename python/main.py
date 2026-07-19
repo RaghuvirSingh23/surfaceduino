@@ -42,6 +42,7 @@ class RuntimeStore:
         self._events: deque[dict[str, Any]] = deque(maxlen=30)
         self._state: dict[str, Any] = {
             "input_mode": "starting",
+            "activation_mode": config.activation_mode,
             "camera": {"status": "starting", "details": {}},
             "bridge": {"status": "starting"},
             "detector": {"calibrated": False, "ambiguous": False},
@@ -50,6 +51,10 @@ class RuntimeStore:
                 {
                     "id": zone.id,
                     "label": zone.label,
+                    "rect": zone.rect,
+                    "action": zone.action,
+                    "group": zone.group,
+                    "sound": zone.sound,
                     "occupancy": 0.0,
                     "occupied": False,
                 }
@@ -76,16 +81,21 @@ class RuntimeStore:
             self._state["buttons"][control] = pressed
 
     def set_detection(self, snapshot: DetectionSnapshot, candidate: str | None) -> None:
+        zone_configs = {zone.id: zone for zone in config.zones}
         with self._lock:
             self._state["detector"] = {
                 "calibrated": snapshot.calibrated,
-                "ambiguous": snapshot.ambiguous,
+                "ambiguous": snapshot.ambiguous and config.activation_mode != "vision_press",
             }
             self._state["candidate"] = candidate
             self._state["zones"] = [
                 {
                     "id": reading.id,
                     "label": reading.label,
+                    "rect": zone_configs[reading.id].rect,
+                    "action": zone_configs[reading.id].action,
+                    "group": zone_configs[reading.id].group,
+                    "sound": zone_configs[reading.id].sound,
                     "occupancy": round(reading.occupancy, 4),
                     "occupied": reading.occupied,
                 }
@@ -123,6 +133,7 @@ camera_retry_at_ms = 0
 last_camera_error: str | None = None
 vision_active = False
 last_good_remote_frame_ms: int | None = None
+active_zone_ids: set[str] = set()
 CAMERA_RETRY_MS = 3_000
 
 
@@ -199,8 +210,12 @@ def video_stream() -> StreamingResponse:
 def feedback_code(event: InteractionEvent) -> int:
     if event.kind != "control.activate":
         return -1
-    ids = [zone.id for zone in config.zones]
-    return ids.index(event.control_id) + 1 if event.control_id in ids else -1
+    group = event.metadata.get("group")
+    if group == "piano":
+        return 1
+    if group == "drum":
+        return 2
+    return 3
 
 
 def publish_event(event: InteractionEvent) -> None:
@@ -234,8 +249,25 @@ def process_commands(timestamp_ms: int) -> None:
             continue
 
         if control == config.inputs.get("confirm_button", "confirm"):
-            publish_event(fusion.confirm(source=source, timestamp_ms=timestamp_ms))
+            if config.activation_mode == "vision_press":
+                zone = config.zones[0]
+                publish_event(
+                    fusion.activate(
+                        zone.id,
+                        source,
+                        timestamp_ms,
+                        metadata={
+                            "input_mode": "physical_test",
+                            "group": zone.group,
+                            "sound": zone.sound,
+                            "action": zone.action,
+                        },
+                    )
+                )
+            else:
+                publish_event(fusion.confirm(source=source, timestamp_ms=timestamp_ms))
         elif control == config.inputs.get("calibrate_button", "calibrate"):
+            active_zone_ids.clear()
             fusion.clear_selection()
             detector.request_calibration()
             logger.info(f"Background recalibration requested by {source}")
@@ -266,6 +298,7 @@ def close_camera(reason: str) -> None:
             logger.warning(f"Camera cleanup failed: {exc}")
     camera_retry_at_ms = now_ms() + CAMERA_RETRY_MS
     vision_active = False
+    active_zone_ids.clear()
     store.set_camera_status("unavailable", {"reason": reason, "retry_ms": CAMERA_RETRY_MS})
     store.set_input_mode("direct_buttons")
 
@@ -309,13 +342,43 @@ def connect_camera(timestamp_ms: int) -> None:
     camera = candidate
     last_camera_error = None
     vision_active = True
-    store.set_input_mode("vision_confirm")
-    logger.info("USB camera connected; using vision + physical confirmation mode")
+    store.set_input_mode(config.activation_mode)
+    logger.info(f"USB camera connected; using {config.activation_mode} mode")
 
 
 def process_vision_frame(frame: Any, timestamp_ms: int) -> None:
     snapshot = detector.analyze(frame)
-    fusion.update_selection(snapshot.candidate_id, snapshot.candidate_confidence, timestamp_ms)
+    if config.activation_mode == "vision_press":
+        zone_configs = {zone.id: zone for zone in config.zones}
+        current_zone_ids = {reading.id for reading in snapshot.zones if reading.occupied}
+        readings = {reading.id: reading for reading in snapshot.zones}
+        if snapshot.calibrated_now:
+            active_zone_ids.clear()
+        else:
+            for control_id in current_zone_ids - active_zone_ids:
+                zone = zone_configs[control_id]
+                publish_event(
+                    fusion.activate(
+                        control_id=control_id,
+                        source="camera.zone",
+                        timestamp_ms=timestamp_ms,
+                        confidence=min(
+                            1.0,
+                            readings[control_id].occupancy / max(config.detector.press_ratio * 2.0, 0.01),
+                        ),
+                        metadata={
+                            "input_mode": "vision_press",
+                            "group": zone.group,
+                            "sound": zone.sound,
+                            "action": zone.action,
+                        },
+                    )
+                )
+            active_zone_ids.clear()
+            active_zone_ids.update(current_zone_ids)
+        fusion.clear_selection()
+    else:
+        fusion.update_selection(snapshot.candidate_id, snapshot.candidate_confidence, timestamp_ms)
     process_commands(timestamp_ms)
 
     if snapshot.calibrated_now:
@@ -332,6 +395,7 @@ def process_vision_frame(frame: Any, timestamp_ms: int) -> None:
             zones=config.zones,
             snapshot=snapshot,
             selection=fusion.selection,
+            activation_mode=config.activation_mode,
             jpeg_quality=config.camera.jpeg_quality,
         )
     )
@@ -354,12 +418,13 @@ def loop_remote_camera(timestamp_ms: int) -> None:
 
         if not vision_active:
             fusion.clear_selection()
+            active_zone_ids.clear()
             detector.request_calibration()
             logger.info("Mac camera feed connected; calibrating remote surface")
 
         vision_active = True
         last_good_remote_frame_ms = timestamp_ms
-        store.set_input_mode("vision_confirm")
+        store.set_input_mode(config.activation_mode)
         store.set_camera_status(
             "streaming",
             {
@@ -381,6 +446,7 @@ def loop_remote_camera(timestamp_ms: int) -> None:
     if vision_active and good_frame_age_ms is not None and good_frame_age_ms > config.camera.stale_after_ms:
         vision_active = False
         fusion.clear_selection()
+        active_zone_ids.clear()
         store.set_input_mode("direct_buttons")
         logger.warning("Mac camera feed stopped; using D2/D3 direct mode")
 

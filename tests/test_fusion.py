@@ -34,6 +34,20 @@ class FusionTests(unittest.TestCase):
         self.assertEqual(event.control_id, "zone_left")
         self.assertEqual(event.metadata["input_mode"], "direct_buttons")
 
+    def test_resolved_camera_zone_keeps_instrument_metadata(self):
+        engine = FusionEngine(stable_ms=180, candidate_timeout_ms=350)
+        event = engine.activate(
+            "drum_kick",
+            "camera.zone",
+            1300,
+            confidence=0.84,
+            metadata={"group": "drum", "sound": "kick", "action": "drum:kick"},
+        )
+        self.assertEqual(event.kind, "control.activate")
+        self.assertEqual(event.control_id, "drum_kick")
+        self.assertAlmostEqual(event.confidence, 0.84)
+        self.assertEqual(event.metadata["sound"], "kick")
+
 
 if __name__ == "__main__":
     unittest.main()

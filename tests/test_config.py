@@ -15,7 +15,11 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.camera.transport, "http_push")
         self.assertEqual(config.camera.resolution, (640, 480))
         self.assertEqual(config.camera.max_resolution, (1280, 720))
-        self.assertEqual([zone.id for zone in config.zones], ["zone_left", "zone_right"])
+        self.assertEqual(len(config.zones), 10)
+        self.assertEqual(config.activation_mode, "vision_press")
+        self.assertEqual([zone.group for zone in config.zones].count("piano"), 6)
+        self.assertEqual([zone.group for zone in config.zones].count("drum"), 4)
+        self.assertEqual(config.zones[0].id, "piano_c4")
 
     def test_rejects_overlapping_hysteresis_thresholds(self):
         raw = json.loads((ROOT / "config" / "surface.json").read_text())

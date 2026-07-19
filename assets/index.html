@@ -31,21 +31,28 @@
           </div>
           <div class="video-wrap">
             <img id="stream" src="/stream" alt="Camera stream with control-zone overlay" />
+            <div class="video-actions">
+              <button id="soundButton" class="sound-button">♫ Enable sound</button>
+              <button id="fullscreenButton" aria-label="Toggle camera fullscreen">⛶ Full screen</button>
+            </div>
           </div>
         </div>
 
         <aside class="controls">
           <section class="panel zone-panel">
-            <p class="kicker">CAMERA INPUTS</p>
-            <div id="zones" class="zones"></div>
+            <div class="layout-heading">
+              <p class="kicker">INSTRUMENT LAYOUT</p>
+              <small>Tap here to preview</small>
+            </div>
+            <div id="zones" class="surface-layout" aria-label="Camera instrument zones"></div>
           </section>
 
           <section class="panel hardware-panel">
             <p class="kicker">PHYSICAL INPUTS</p>
-            <div class="button-state"><span id="confirmLabel">D2 · CONFIRM</span><b id="confirmState">UP</b></div>
+            <div class="button-state"><span id="confirmLabel">D2 · TEST C4</span><b id="confirmState">UP</b></div>
             <div class="button-state"><span id="calibrateLabel">D3 · CALIBRATE</span><b id="calibrateState">UP</b></div>
             <div class="actions">
-              <button id="confirmButton" class="primary">Simulate confirm</button>
+              <button id="confirmButton" class="primary">Test C4</button>
               <button id="calibrateButton">Capture background</button>
             </div>
           </section>

@@ -35,15 +35,15 @@ class DetectorTests(unittest.TestCase):
         )
         return frame
 
-    def test_three_frames_select_left_zone(self):
+    def test_press_selects_first_piano_key(self):
         snapshot = None
         for _ in range(self.config.detector.press_frames):
             snapshot = self.detector.analyze(self.occupied_frame(0))
         self.assertIsNotNone(snapshot)
-        self.assertEqual(snapshot.candidate_id, "zone_left")
+        self.assertEqual(snapshot.candidate_id, "piano_c4")
         self.assertFalse(snapshot.ambiguous)
 
-    def test_both_zones_are_ambiguous(self):
+    def test_two_zones_are_reported_as_ambiguous_by_detector(self):
         frame = self.occupied_frame(0)
         right = self.occupied_frame(1)
         frame[right[:, :, 0] < 100] = (20, 20, 20)

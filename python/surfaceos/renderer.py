@@ -18,6 +18,7 @@ def render_overlay(
     zones: tuple[ZoneConfig, ...],
     snapshot: DetectionSnapshot,
     selection: Selection | None,
+    activation_mode: str,
     jpeg_quality: int,
 ) -> bytes:
     canvas = frame.copy()
@@ -27,7 +28,9 @@ def render_overlay(
     for zone in zones:
         x0, y0, x1, y1 = _bounds(zone.rect, width, height)
         reading = readings[zone.id]
-        selected = selection is not None and selection.control_id == zone.id
+        selected = reading.occupied if activation_mode == "vision_press" else (
+            selection is not None and selection.control_id == zone.id
+        )
         color = tuple(int(value) for value in zone.color_bgr)
         thickness = 5 if selected else 2
 
@@ -36,18 +39,27 @@ def render_overlay(
             cv2.rectangle(overlay, (x0, y0), (x1, y1), color, -1)
             cv2.addWeighted(overlay, 0.18, canvas, 0.82, 0, canvas)
         cv2.rectangle(canvas, (x0, y0), (x1, y1), color, thickness)
+        label = zone.label if activation_mode == "vision_press" else f"{zone.label}  {reading.occupancy * 100:4.1f}%"
+        font_scale = 0.58 if activation_mode == "vision_press" else 0.8
         cv2.putText(
             canvas,
-            f"{zone.label}  {reading.occupancy * 100:4.1f}%",
-            (x0 + 12, y0 + 34),
+            label,
+            (x0 + 7, y0 + 28),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
+            font_scale,
             color,
             2,
             cv2.LINE_AA,
         )
 
-    if snapshot.ambiguous:
+    active_labels = [reading.label for reading in snapshot.zones if reading.occupied]
+    if activation_mode == "vision_press" and active_labels:
+        status = f"PLAYING: {' + '.join(active_labels)}"
+        status_color = (80, 245, 170)
+    elif activation_mode == "vision_press":
+        status = "TOUCH THE SURFACE: PIANO + DRUMS"
+        status_color = (235, 235, 235)
+    elif snapshot.ambiguous:
         status = "AMBIGUOUS: clear one zone"
         status_color = (30, 30, 255)
     elif selection is not None:

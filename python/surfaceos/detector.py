@@ -35,11 +35,7 @@ class _ZoneGate:
 
 
 class BackgroundZoneDetector:
-    """Lightweight two-zone foreground detector for a fixed camera.
-
-    It detects occupancy/hover, not physical contact. An independent confirmation
-    source (button today, impact sensor later) commits the selected control.
-    """
+    """Lightweight foreground detector for camera-defined surface zones."""
 
     def __init__(
         self,
@@ -136,7 +132,7 @@ class BackgroundZoneDetector:
         if candidate is not None:
             confidence = min(1.0, candidate.occupancy / max(self.config.press_ratio * 2.0, 0.01))
 
-        # Adapt very slowly only when neither control is occupied. This handles
+        # Adapt very slowly only when no control is occupied. This handles
         # gradual daylight drift while avoiding learning a hand into the background.
         if not occupied and self.config.adapt_rate > 0:
             cv2.accumulateWeighted(prepared, self._background, self.config.adapt_rate)

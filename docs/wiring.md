@@ -6,7 +6,7 @@ Turn off power before changing breadboard wiring.
 
 | Control | UNO Q pin | Other button side | Behaviour |
 |---|---:|---:|---|
-| Confirm selected camera zone | D2 | GND | Pressed reads LOW |
+| Test C4 note | D2 | GND | Pressed reads LOW |
 | Capture empty background | D3 | GND | Pressed reads LOW |
 
 Both inputs use `INPUT_PULLUP`; do not connect either button to 5 V.
@@ -14,7 +14,7 @@ Both inputs use `INPUT_PULLUP`; do not connect either button to 5 V.
 Most tactile switches have four legs arranged as two permanently connected pairs. Place the switch across the breadboard centre gap so pressing it connects the two halves. If a button reads as permanently pressed, rotate it 90 degrees.
 
 ```text
-UNO Q D2 ───── [ CONFIRM ] ───── UNO Q GND
+UNO Q D2 ───── [ C4 TEST ] ───── UNO Q GND
 UNO Q D3 ───── [ CALIBRATE ] ─── UNO Q GND
 ```
 
@@ -22,10 +22,10 @@ UNO Q D3 ───── [ CALIBRATE ] ─── UNO Q GND
 
 The sketch uses the UNO Q's built-in RGB LED:
 
-- blue pulse: zone ONE activated;
-- red pulse: zone TWO activated;
+- blue pulse: piano key activated;
+- red pulse: drum pad activated;
 - green pulse: background captured;
-- magenta pulse: confirmation rejected.
+- magenta pulse: input error.
 
 Do not wire the loose 5 mm LEDs directly to GPIO. Obtain 220–330 Ω series resistors first.
 
