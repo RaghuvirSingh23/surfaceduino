@@ -241,9 +241,17 @@ def process_commands(timestamp_ms: int) -> None:
             logger.info(f"Background recalibration requested by {source}")
 
 
+async def ingest_tap(request: Request) -> JSONResponse:
+    """Accept a tap event from the Glyph C6 IR sensor relay running on the Mac."""
+    ts = now_ms()
+    commands.put(("confirm", "glyph.ir", True, ts))
+    return JSONResponse({"queued": True}, status_code=202)
+
+
 ui.expose_api("GET", "/state", state_api)
 ui.expose_api("GET", "/stream", video_stream)
 ui.expose_api("POST", "/ingest/frame", ingest_frame)
+ui.expose_api("POST", "/ingest/tap", ingest_tap)
 ui.expose_api("POST", "/confirm", lambda: enqueue_ui_command("confirm"))
 ui.expose_api("POST", "/calibrate", lambda: enqueue_ui_command("calibrate"))
 
@@ -321,7 +329,7 @@ def process_vision_frame(frame: Any, timestamp_ms: int) -> None:
     if snapshot.calibrated_now:
         logger.info("Background captured. SurfaceOS is ready.")
         try:
-            Bridge.notify("surfaceos_feedback", 3)
+            Bridge.notify("surfaceos_feedback", 11)  # 11 = calibrated (green)
         except Exception as exc:
             store.set_bridge_status(f"feedback error: {exc}")
 
