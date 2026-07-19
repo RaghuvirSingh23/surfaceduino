@@ -17,6 +17,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.camera.max_resolution, (1280, 720))
         self.assertEqual(len(config.zones), 10)
         self.assertEqual(config.activation_mode, "vision_press")
+        self.assertEqual(config.detector.method, "landmark")
+        self.assertEqual(config.detector.landmark_max_hands, 2)
         self.assertEqual([zone.group for zone in config.zones].count("piano"), 6)
         self.assertEqual([zone.group for zone in config.zones].count("drum"), 4)
         self.assertEqual(config.zones[0].id, "piano_c4")

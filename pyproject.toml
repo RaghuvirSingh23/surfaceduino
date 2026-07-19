@@ -7,6 +7,7 @@ dependencies = [
   "numpy>=1.26",
   "opencv-python-headless>=4.7",
   "Pillow>=10",
+  "ai-edge-litert>=1.0",
 ]
 
 [tool.ruff]

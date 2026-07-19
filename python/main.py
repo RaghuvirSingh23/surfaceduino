@@ -47,6 +47,8 @@ class RuntimeStore:
             "bridge": {"status": "starting"},
             "detector": {"calibrated": False, "ambiguous": False},
             "candidate": None,
+            "fingertips": [],
+            "hands": [],
             "zones": [
                 {
                     "id": zone.id,
@@ -88,6 +90,17 @@ class RuntimeStore:
                 "ambiguous": snapshot.ambiguous and config.activation_mode != "vision_press",
             }
             self._state["candidate"] = candidate
+            self._state["fingertips"] = [
+                {"x": round(tip.x, 4), "y": round(tip.y, 4)} for tip in snapshot.fingertips
+            ]
+            self._state["hands"] = [
+                {
+                    "score": round(hand.score, 3),
+                    "handedness": "right" if hand.handedness >= 0.5 else "left",
+                    "points": [{"x": round(float(x), 4), "y": round(float(y), 4)} for x, y in hand.landmarks],
+                }
+                for hand in snapshot.hands
+            ]
             self._state["zones"] = [
                 {
                     "id": reading.id,

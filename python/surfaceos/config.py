@@ -30,6 +30,17 @@ class DetectorConfig:
     stable_ms: int
     candidate_timeout_ms: int
     adapt_rate: float
+    method: str
+    fingertip_min_area_frac: float
+    fingertip_defect_depth_frac: float
+    fingertip_finger_angle_deg: float
+    fingertip_merge_radius_frac: float
+    fingertip_max_points: int
+    landmark_palm_score: float
+    landmark_score: float
+    landmark_max_hands: int
+    landmark_detect_period: int
+    landmark_num_threads: int
 
 
 @dataclass(frozen=True)
@@ -94,6 +105,12 @@ def load_config(path: str | Path) -> SurfaceConfig:
     if detector["release_ratio"] >= detector["press_ratio"]:
         raise ValueError("release_ratio must be lower than press_ratio for hysteresis")
 
+    detector_method = str(detector.get("method", "landmark"))
+    if detector_method not in {"landmark", "fingertip", "occupancy"}:
+        raise ValueError("detector.method must be landmark, fingertip or occupancy")
+    fingertip = detector.get("fingertip", {})
+    landmark = detector.get("landmark", {})
+
     transport = str(camera.get("transport", "http_push"))
     if transport not in {"http_push", "local_usb"}:
         raise ValueError("camera.transport must be http_push or local_usb")
@@ -128,6 +145,17 @@ def load_config(path: str | Path) -> SurfaceConfig:
             stable_ms=int(detector["stable_ms"]),
             candidate_timeout_ms=int(detector["candidate_timeout_ms"]),
             adapt_rate=float(detector.get("adapt_rate", 0.0)),
+            method=detector_method,
+            fingertip_min_area_frac=float(fingertip.get("min_area_frac", 0.010)),
+            fingertip_defect_depth_frac=float(fingertip.get("defect_depth_frac", 0.020)),
+            fingertip_finger_angle_deg=float(fingertip.get("finger_angle_deg", 90.0)),
+            fingertip_merge_radius_frac=float(fingertip.get("merge_radius_frac", 0.030)),
+            fingertip_max_points=int(fingertip.get("max_points", 10)),
+            landmark_palm_score=float(landmark.get("palm_score", 0.5)),
+            landmark_score=float(landmark.get("landmark_score", 0.5)),
+            landmark_max_hands=int(landmark.get("max_hands", 2)),
+            landmark_detect_period=int(landmark.get("detect_period", 8)),
+            landmark_num_threads=int(landmark.get("num_threads", 4)),
         ),
         activation_mode=activation_mode,
         dwell_ms=int(activation.get("dwell_ms", 900)),

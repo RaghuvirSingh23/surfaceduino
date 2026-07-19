@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .config import DetectorConfig, ZoneConfig
+from .fingertips import Fingertip, FingertipParams, FingertipTracker
+from .handtracking import Hand, HandLandmarker
+
+logger = logging.getLogger("surfaceos.detector")
+
+MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 
 
 @dataclass(frozen=True)
@@ -25,6 +33,8 @@ class DetectionSnapshot:
     ambiguous: bool
     zones: tuple[ZoneReading, ...]
     mask: np.ndarray | None
+    fingertips: tuple[Fingertip, ...] = ()
+    hands: tuple[Hand, ...] = ()
 
 
 @dataclass
@@ -49,6 +59,42 @@ class BackgroundZoneDetector:
         self._background: np.ndarray | None = None
         self._calibration_requested = True
         self._gates = {zone.id: _ZoneGate() for zone in zones}
+        self._fingertips = FingertipTracker(
+            FingertipParams(
+                min_area_frac=config.fingertip_min_area_frac,
+                defect_depth_frac=config.fingertip_defect_depth_frac,
+                finger_angle_deg=config.fingertip_finger_angle_deg,
+                merge_radius_frac=config.fingertip_merge_radius_frac,
+                max_points=config.fingertip_max_points,
+            )
+        )
+        self.method = config.method
+        self._hand_tracker: HandLandmarker | None = None
+        if config.method == "landmark":
+            self._hand_tracker = self._build_hand_tracker(config)
+            if self._hand_tracker is None:
+                logger.warning("Landmark tracking unavailable; falling back to convexity fingertips")
+                self.method = "fingertip"
+
+    def _build_hand_tracker(self, config: DetectorConfig) -> HandLandmarker | None:
+        palm = MODELS_DIR / "palm_detection_full.tflite"
+        landmark = MODELS_DIR / "hand_landmark_full.tflite"
+        if not palm.exists() or not landmark.exists():
+            logger.warning("Hand landmark models not found in %s", MODELS_DIR)
+            return None
+        try:
+            return HandLandmarker(
+                palm,
+                landmark,
+                palm_score_thresh=config.landmark_palm_score,
+                landmark_score_thresh=config.landmark_score,
+                max_hands=config.landmark_max_hands,
+                detect_period=config.landmark_detect_period,
+                num_threads=config.landmark_num_threads,
+            )
+        except Exception as exc:  # LiteRT missing or model load error
+            logger.warning("Could not initialize hand landmark tracker: %s", exc)
+            return None
 
     @property
     def calibrated(self) -> bool:
@@ -79,12 +125,19 @@ class BackgroundZoneDetector:
             gate.high_frames = 0
             gate.low_frames = 0
 
+    @staticmethod
+    def _fingertip_in_zone(zone: ZoneConfig, fingertips: list[Fingertip]) -> bool:
+        x0, y0, x1, y1 = zone.rect
+        return any(x0 <= tip.x <= x1 and y0 <= tip.y <= y1 for tip in fingertips)
+
     def analyze(self, frame: np.ndarray) -> DetectionSnapshot:
         prepared = self._prepare(frame)
         if self._background is None or self._calibration_requested:
             self._background = prepared.astype(np.float32)
             self._calibration_requested = False
             self._reset_gates()
+            if self._hand_tracker is not None:
+                self._hand_tracker.reset()
             return DetectionSnapshot(
                 calibrated=True,
                 calibrated_now=True,
@@ -93,6 +146,8 @@ class BackgroundZoneDetector:
                 ambiguous=False,
                 zones=tuple(ZoneReading(zone.id, zone.label, 0.0, False) for zone in self.zones),
                 mask=np.zeros_like(prepared),
+                fingertips=(),
+                hands=(),
             )
 
         background_u8 = cv2.convertScaleAbs(self._background)
@@ -102,6 +157,18 @@ class BackgroundZoneDetector:
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
 
+        hands: list[Hand] = []
+        if self.method == "landmark" and self._hand_tracker is not None:
+            hands = self._hand_tracker.process(frame)
+            fingertips = [Fingertip(x=x, y=y) for hand in hands for (x, y) in hand.fingertips()]
+            use_fingertips = True
+        elif self.method == "fingertip":
+            fingertips = self._fingertips.detect(mask)
+            use_fingertips = True
+        else:
+            fingertips = []
+            use_fingertips = False
+
         readings: list[ZoneReading] = []
         for zone in self.zones:
             x0, y0, x1, y1 = self._zone_bounds(zone)
@@ -109,7 +176,19 @@ class BackgroundZoneDetector:
             occupancy = float(cv2.countNonZero(roi)) / float(max(1, roi.size))
             gate = self._gates[zone.id]
 
-            if occupancy >= self.config.press_ratio:
+            if use_fingertips:
+                fingertip_inside = self._fingertip_in_zone(zone, fingertips)
+                if fingertip_inside:
+                    gate.high_frames += 1
+                    gate.low_frames = 0
+                    if gate.high_frames >= self.config.press_frames:
+                        gate.occupied = True
+                else:
+                    gate.low_frames += 1
+                    gate.high_frames = 0
+                    if gate.low_frames >= self.config.release_frames:
+                        gate.occupied = False
+            elif occupancy >= self.config.press_ratio:
                 gate.high_frames += 1
                 gate.low_frames = 0
                 if gate.high_frames >= self.config.press_frames:
@@ -145,4 +224,6 @@ class BackgroundZoneDetector:
             ambiguous=ambiguous,
             zones=tuple(readings),
             mask=mask,
+            fingertips=tuple(fingertips),
+            hands=tuple(hands),
         )

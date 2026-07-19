@@ -1,3 +1,4 @@
+import dataclasses
 import unittest
 from pathlib import Path
 
@@ -14,8 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 class DetectorTests(unittest.TestCase):
     def setUp(self):
         self.config = load_config(ROOT / "config" / "surface.json")
+        # These tests simulate solid blobs (not real hands), so exercise the
+        # marker-free convexity fingertip path deterministically.
+        detector_config = dataclasses.replace(self.config.detector, method="fingertip")
         self.detector = BackgroundZoneDetector(
-            self.config.detector,
+            detector_config,
             self.config.zones,
             self.config.camera.processing_resolution,
         )

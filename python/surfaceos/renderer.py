@@ -6,6 +6,7 @@ import numpy as np
 from .config import ZoneConfig
 from .detector import DetectionSnapshot
 from .fusion import Selection
+from .handtracking import HAND_CONNECTIONS
 
 
 def _bounds(rect: tuple[float, float, float, float], width: int, height: int) -> tuple[int, int, int, int]:
@@ -51,6 +52,19 @@ def render_overlay(
             2,
             cv2.LINE_AA,
         )
+
+    for hand in snapshot.hands:
+        points = [(round(px * width), round(py * height)) for px, py in hand.landmarks]
+        for a, b in HAND_CONNECTIONS:
+            cv2.line(canvas, points[a], points[b], (235, 235, 235), 2, cv2.LINE_AA)
+        for px, py in points:
+            cv2.circle(canvas, (px, py), 3, (60, 200, 255), -1, cv2.LINE_AA)
+
+    for tip in snapshot.fingertips:
+        cx, cy = round(tip.x * width), round(tip.y * height)
+        cv2.circle(canvas, (cx, cy), 9, (12, 16, 20), -1)
+        cv2.circle(canvas, (cx, cy), 9, (80, 245, 170), 2, cv2.LINE_AA)
+        cv2.circle(canvas, (cx, cy), 2, (80, 245, 170), -1, cv2.LINE_AA)
 
     active_labels = [reading.label for reading in snapshot.zones if reading.occupied]
     if activation_mode == "vision_press" and active_labels:

@@ -7,7 +7,8 @@ This first version deliberately detects **occupancy/hover, not physical touch**.
 ## What works in this milestone
 
 - Ten camera-defined instrument regions: six piano keys and four drum pads
-- Lightweight OpenCV background subtraction at 320×240 processing resolution
+- **Fingertip tracking**: OpenCV background subtraction + convexity-defect fingertip extraction at 320×240; a zone fires when a fingertip enters it (not whole-hand occupancy)
+- Separate **Piano** and **Drums** screens in a React + Tailwind + shadcn dashboard
 - D2 physical **C4 TEST** button
 - D3 physical **CALIBRATE** button
 - Linux ↔ STM32 communication through Arduino RouterBridge
@@ -65,9 +66,31 @@ The first frame is automatically treated as an empty background. D3 recaptures i
 
 Use the dashboard's **Instrument layout** as the surface guide. It mirrors the normalized regions drawn over the live camera feed and every pad can be clicked to preview its sound.
 
+## Fingertip tracking
+
+The detector isolates the hand with background subtraction, then finds fingertips as the convex extremities flanking the deep valleys between fingers (with a topmost-point fallback for a single extended finger). A zone activates when a tracked fingertip lands inside it, so you can rest a palm on the surface and still press one key. Tune it under `detector` in `config/surface.json`:
+
+- `method`: `"fingertip"` (default) or `"occupancy"` (legacy whole-region trigger)
+- `fingertip.min_area_frac`, `fingertip.defect_depth_frac`, `fingertip.finger_angle_deg`, `fingertip.merge_radius_frac`, `fingertip.max_points`
+
+Later, the Modulino Movement / IR sensor can confirm a *tap* on top of the tracked fingertip without changing the vision or event API.
+
+## Frontend (React + Tailwind + shadcn)
+
+The on-board dashboard is a Vite + React + TypeScript app in `frontend/`, built with Tailwind v4 and shadcn-style components. It has a home screen plus **separate Piano and Drums screens** (client-side, no server routes) that share one polling loop and audio engine. Piano and drum audio is synthesized in the browser and only the active screen's instrument plays.
+
+The production build is committed to `assets/`, which the UNO Q `WebUI` brick serves statically. To change the UI, edit `frontend/` and rebuild:
+
+```bash
+cd frontend
+npm install      # first time only
+npm run dev      # local dev; proxies /state, /stream, /confirm, /calibrate to 127.0.0.1:17000
+npm run build    # emits assets/index.html + assets/static/* for the board
+```
+
 ## Local verification
 
-The hardware-neutral detector and fusion logic can be tested on a laptop:
+The hardware-neutral detector, fingertip tracker and fusion logic can be tested on a laptop:
 
 ```bash
 ./scripts/test.sh

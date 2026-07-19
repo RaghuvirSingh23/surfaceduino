@@ -31,9 +31,9 @@ CLEAR
 
 Each of the ten zones has its own gate, so piano chords and simultaneous drums work. Release uses a lower occupancy threshold and more frames than press, preventing boundary flicker.
 
-## Why background subtraction first
+## Why background subtraction + fingertips first
 
-It uses OpenCV already present in Arduino App Lab, has no neural-model dependency, fits the 2 GB board and requires no marker or additional sensor. It detects a hand or object entering a region; it does not infer fingertip contact.
+It uses OpenCV already present in Arduino App Lab, has no neural-model dependency, fits the 2 GB board and requires no marker or additional sensor. Background subtraction isolates the hand; `surfaceos/fingertips.py` then extracts fingertip points via convex hull / convexity defects. A zone fires when a tracked fingertip enters it, so a single finger can press one key while the palm rests elsewhere. It detects a fingertip *over* a region; it does not yet infer physical contact — that is the future IR/Movement tap seam.
 
 The detector is intentionally replaceable. Later input adapters can provide:
 

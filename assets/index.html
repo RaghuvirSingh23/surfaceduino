@@ -1,70 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SurfaceOS MVP</title>
-    <link rel="stylesheet" href="./style.css" />
+    <title>SurfaceOS</title>
+    <script type="module" crossorigin src="./static/index-DJ7-cwkW.js"></script>
+    <link rel="stylesheet" crossorigin href="./static/index-BIr5CfkD.css">
   </head>
   <body>
-    <main class="shell">
-      <header>
-        <div>
-          <p class="eyebrow">ARDUINO UNO Q · ON-DEVICE</p>
-          <h1>Surface<span>OS</span></h1>
-        </div>
-        <div class="status-row">
-          <span id="cameraStatus" class="pill waiting">camera</span>
-          <span id="bridgeStatus" class="pill waiting">bridge</span>
-          <span id="calibrationStatus" class="pill waiting">uncalibrated</span>
-        </div>
-      </header>
-
-      <section class="grid">
-        <div class="camera-panel panel">
-          <div class="panel-heading">
-            <div>
-              <p class="kicker">LIVE SURFACE</p>
-              <h2 id="instruction">Clear the surface, then calibrate.</h2>
-            </div>
-            <div id="candidate" class="candidate">NO SELECTION</div>
-          </div>
-          <div class="video-wrap">
-            <img id="stream" src="/stream" alt="Camera stream with control-zone overlay" />
-            <div class="video-actions">
-              <button id="soundButton" class="sound-button">♫ Enable sound</button>
-              <button id="fullscreenButton" aria-label="Toggle camera fullscreen">⛶ Full screen</button>
-            </div>
-          </div>
-        </div>
-
-        <aside class="controls">
-          <section class="panel zone-panel">
-            <div class="layout-heading">
-              <p class="kicker">INSTRUMENT LAYOUT</p>
-              <small>Tap here to preview</small>
-            </div>
-            <div id="zones" class="surface-layout" aria-label="Camera instrument zones"></div>
-          </section>
-
-          <section class="panel hardware-panel">
-            <p class="kicker">PHYSICAL INPUTS</p>
-            <div class="button-state"><span id="confirmLabel">D2 · TEST C4</span><b id="confirmState">UP</b></div>
-            <div class="button-state"><span id="calibrateLabel">D3 · CALIBRATE</span><b id="calibrateState">UP</b></div>
-            <div class="actions">
-              <button id="confirmButton" class="primary">Test C4</button>
-              <button id="calibrateButton">Capture background</button>
-            </div>
-          </section>
-
-          <section class="panel event-panel">
-            <p class="kicker">EVENT BUS</p>
-            <div id="lastEvent" class="last-event">Waiting for an activation…</div>
-            <ol id="eventLog" class="event-log"></ol>
-          </section>
-        </aside>
-      </section>
-    </main>
-    <script src="./app.js"></script>
+    <div id="root"></div>
   </body>
 </html>

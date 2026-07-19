@@ -12,14 +12,29 @@
     "max_jpeg_bytes": 524288
   },
   "detector": {
+    "method": "landmark",
     "pixel_threshold": 28,
     "press_ratio": 0.14,
     "release_ratio": 0.06,
     "press_frames": 1,
-    "release_frames": 2,
+    "release_frames": 3,
     "stable_ms": 180,
     "candidate_timeout_ms": 350,
-    "adapt_rate": 0.001
+    "adapt_rate": 0.001,
+    "fingertip": {
+      "min_area_frac": 0.010,
+      "defect_depth_frac": 0.020,
+      "finger_angle_deg": 90.0,
+      "merge_radius_frac": 0.030,
+      "max_points": 10
+    },
+    "landmark": {
+      "palm_score": 0.5,
+      "landmark_score": 0.5,
+      "max_hands": 2,
+      "detect_period": 8,
+      "num_threads": 4
+    }
   },
   "activation": {
     "mode": "vision_press",
