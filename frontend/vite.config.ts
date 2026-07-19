@@ -26,6 +26,7 @@ export default defineConfig({
       "/confirm": "http://127.0.0.1:17000",
       "/calibrate": "http://127.0.0.1:17000",
       "/ingest": "http://127.0.0.1:17000",
+      "/api": "http://127.0.0.1:17000",
     },
   },
 });

@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SurfaceOS Agent Console Presets",
+  "description": "Configures agent console mode: each zone on the physical surface maps to a tile running an autonomous agent.",
+  "type": "object",
+  "required": ["active", "presets"],
+  "additionalProperties": false,
+  "properties": {
+    "active": {
+      "type": "string",
+      "description": "ID of the preset to load on startup."
+    },
+    "presets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Preset" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "Preset": {
+      "type": "object",
+      "required": ["version", "id", "name", "layout", "tiles"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string", "const": "1" },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "Unique preset identifier (snake_case)."
+        },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "layout": {
+          "type": "object",
+          "required": ["cols"],
+          "additionalProperties": false,
+          "properties": {
+            "cols": { "type": "integer", "minimum": 1, "maximum": 6 },
+            "rows": { "type": "integer", "minimum": 1, "maximum": 6 }
+          }
+        },
+        "tiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Tile" }
+        }
+      }
+    },
+    "Tile": {
+      "type": "object",
+      "required": ["id", "agent"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "Unique tile identifier within the preset."
+        },
+        "zone_id": {
+          "type": "string",
+          "description": "Maps this tile to a physical surface zone (from surface.json). Tapping the zone refreshes this tile."
+        },
+        "position": { "$ref": "#/$defs/Position" },
+        "label": {
+          "type": "string",
+          "description": "Display label for the tile header. Falls back to tile id if omitted."
+        },
+        "accent": {
+          "type": "string",
+          "enum": ["blue", "green", "amber", "red", "purple", "cyan", "default"],
+          "default": "default",
+          "description": "Left-border accent color of the tile card."
+        },
+        "auto_refresh_s": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Auto-refresh interval in seconds. Omit to only refresh on physical tap or UI click."
+        },
+        "agent": { "$ref": "#/$defs/AgentConfig" }
+      }
+    },
+    "Position": {
+      "type": "object",
+      "required": ["col", "row"],
+      "additionalProperties": false,
+      "properties": {
+        "col": { "type": "integer", "minimum": 1 },
+        "row": { "type": "integer", "minimum": 1 },
+        "col_span": { "type": "integer", "minimum": 1, "default": 1 },
+        "row_span": { "type": "integer", "minimum": 1, "default": 1 }
+      }
+    },
+    "AgentConfig": {
+      "oneOf": [
+        { "$ref": "#/$defs/ClockAgent" },
+        { "$ref": "#/$defs/NoteAgent" },
+        { "$ref": "#/$defs/NewsAgent" },
+        { "$ref": "#/$defs/StocksAgent" },
+        { "$ref": "#/$defs/AIQueryAgent" },
+        { "$ref": "#/$defs/MetricAgent" },
+        { "$ref": "#/$defs/CodexCLIAgent" }
+      ]
+    },
+    "ClockAgent": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "clock" },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": ["12h", "24h"],
+              "default": "24h"
+            },
+            "show_date": { "type": "boolean", "default": true },
+            "show_seconds": { "type": "boolean", "default": false },
+            "timezone": {
+              "type": "string",
+              "description": "IANA timezone string, e.g. 'America/Los_Angeles'. Defaults to local device timezone."
+            }
+          }
+        }
+      }
+    },
+    "NoteAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "note" },
+        "config": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string", "description": "Static text content to display in the tile." }
+          }
+        }
+      }
+    },
+    "NewsAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "news" },
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["hackernews", "bbc_tech", "techcrunch"],
+              "default": "hackernews",
+              "description": "News source. All sources are public RSS/JSON APIs — no API key required."
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 4
+            }
+          }
+        }
+      }
+    },
+    "StocksAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "stocks" },
+        "config": {
+          "type": "object",
+          "required": ["tickers"],
+          "additionalProperties": false,
+          "properties": {
+            "tickers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "maxItems": 6,
+              "description": "Stock ticker symbols (e.g. [\"NVDA\", \"AAPL\"]). Requires yfinance: pip install yfinance"
+            },
+            "algo": {
+              "type": "string",
+              "enum": ["price_change", "rsi_momentum", "volume_spike"],
+              "default": "price_change",
+              "description": "Algorithm to derive a signal from price history."
+            },
+            "period": {
+              "type": "string",
+              "enum": ["1d", "5d", "1mo"],
+              "default": "1d"
+            }
+          }
+        }
+      }
+    },
+    "AIQueryAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "ai_query" },
+        "config": {
+          "type": "object",
+          "required": ["prompt"],
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "Prompt sent to Claude. Supports {date} and {time} placeholders."
+            },
+            "system": {
+              "type": "string",
+              "description": "Optional system prompt to set Claude's persona or constraints."
+            },
+            "model": {
+              "type": "string",
+              "default": "claude-haiku-4-5-20251001",
+              "description": "Anthropic model ID. Requires ANTHROPIC_API_KEY env variable."
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 32,
+              "maximum": 1024,
+              "default": 200
+            }
+          }
+        }
+      }
+    },
+    "MetricAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "metric" },
+        "config": {
+          "type": "object",
+          "required": ["url"],
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL of a JSON endpoint to fetch."
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Optional HTTP headers (e.g. Authorization: Bearer <token>)."
+            },
+            "value_path": {
+              "type": "string",
+              "description": "Dot-notation path into the response JSON to extract the main value (e.g. 'data.price')."
+            },
+            "label_path": {
+              "type": "string",
+              "description": "Dot-notation path to extract a supplementary label string."
+            },
+            "unit": {
+              "type": "string",
+              "description": "Unit suffix displayed next to the value (e.g. 'ms', '%', 'req/s')."
+            }
+          }
+        }
+      }
+    },
+    "CodexCLIAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "codex_cli" },
+        "config": {
+          "type": "object",
+          "required": ["prompt"],
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "Instructions for the Codex agent. Supports {date} and {time} placeholders. The agent runs non-interactively via `codex exec`."
+            },
+            "model": {
+              "type": "string",
+              "default": "o4-mini",
+              "description": "OpenAI model for the Codex agent (e.g. o4-mini, o3, gpt-4o)."
+            },
+            "sandbox": {
+              "type": "string",
+              "enum": ["read-only", "workspace-write", "danger-full-access"],
+              "default": "read-only",
+              "description": "Codex sandbox policy controlling which shell commands the agent may run."
+            },
+            "writable_dir": {
+              "type": "string",
+              "description": "Additional directory the agent may write to (only relevant when sandbox is workspace-write)."
+            },
+            "timeout_s": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 300,
+              "default": 60,
+              "description": "Maximum wall-clock seconds to wait for the Codex agent to finish before returning an error."
+            }
+          }
+        }
+      }
+    }
+  }
+}

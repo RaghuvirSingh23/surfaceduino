@@ -15,6 +15,7 @@ from arduino.app_bricks.web_ui import WebUI
 from arduino.app_peripherals.camera import Camera
 from arduino.app_utils import App, Bridge, Logger
 
+from surfaceos.agents import load_presets, run_agent
 from surfaceos.config import SurfaceConfig, load_config
 from surfaceos.detector import BackgroundZoneDetector, DetectionSnapshot
 from surfaceos.events import InteractionEvent
@@ -25,9 +26,11 @@ from surfaceos.renderer import render_overlay
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = APP_ROOT / "config" / "surface.json"
+AGENT_PRESETS_PATH = APP_ROOT / "config" / "agent_presets.json"
 
 logger = Logger("SurfaceOS")
 config: SurfaceConfig = load_config(CONFIG_PATH)
+agent_presets = load_presets(AGENT_PRESETS_PATH)
 ui = WebUI()
 
 
@@ -293,10 +296,34 @@ async def ingest_tap(request: Request) -> JSONResponse:
     return JSONResponse({"queued": True}, status_code=202)
 
 
+def api_agent_presets() -> dict[str, Any]:
+    return agent_presets
+
+
+async def api_agent_run(request: Request) -> JSONResponse:
+    import asyncio
+    body = await request.json()
+    preset_id: str = body.get("preset_id", "")
+    tile_id: str = body.get("tile_id", "")
+
+    preset = next((p for p in agent_presets.get("presets", []) if p["id"] == preset_id), None)
+    if preset is None:
+        raise HTTPException(status_code=404, detail=f"Preset {preset_id!r} not found")
+    tile = next((t for t in preset.get("tiles", []) if t["id"] == tile_id), None)
+    if tile is None:
+        raise HTTPException(status_code=404, detail=f"Tile {tile_id!r} not found in preset {preset_id!r}")
+
+    loop = asyncio.get_event_loop()
+    data = await loop.run_in_executor(None, run_agent, tile.get("agent", {}))
+    return JSONResponse({"tile_id": tile_id, "preset_id": preset_id, "data": data, "updated_at": now_ms()})
+
+
 ui.expose_api("GET", "/state", state_api)
 ui.expose_api("GET", "/stream", video_stream)
 ui.expose_api("POST", "/ingest/frame", ingest_frame)
 ui.expose_api("POST", "/ingest/tap", ingest_tap)
+ui.expose_api("GET", "/api/agent-presets", api_agent_presets)
+ui.expose_api("POST", "/api/agent/run", api_agent_run)
 ui.expose_api("POST", "/confirm", lambda: enqueue_ui_command("confirm"))
 ui.expose_api("POST", "/calibrate", lambda: enqueue_ui_command("calibrate"))
 

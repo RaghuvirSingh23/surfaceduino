@@ -1,4 +1,4 @@
-import { Drum, Home, Music2, Volume2, VolumeX } from "lucide-react";
+import { Drum, Home, LayoutGrid, Music2, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusPills } from "@/components/StatusPills";
@@ -19,6 +19,7 @@ const NAV: { id: Screen; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "piano", label: "Piano", icon: Music2 },
   { id: "drums", label: "Drums", icon: Drum },
+  { id: "console", label: "Console", icon: LayoutGrid },
 ];
 
 export function AppHeader({
