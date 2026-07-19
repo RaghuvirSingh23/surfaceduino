@@ -1,0 +1,6 @@
+name: SurfaceOS MVP
+icon: 🔲
+description: Two camera-defined controls with physical confirmation, running entirely on Arduino UNO Q.
+
+bricks:
+  - arduino:web_ui

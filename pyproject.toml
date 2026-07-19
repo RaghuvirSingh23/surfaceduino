@@ -1,0 +1,14 @@
+[project]
+name = "surfaceos-mvp"
+version = "0.1.0"
+description = "A camera-defined physical control surface for Arduino UNO Q"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "opencv-python-headless>=4.7",
+  "Pillow>=10",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

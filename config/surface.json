@@ -1,0 +1,53 @@
+{
+  "camera": {
+    "source": "0",
+    "resolution": [640, 480],
+    "processing_resolution": [320, 240],
+    "fps": 15,
+    "codec": "MJPG",
+    "jpeg_quality": 72
+  },
+  "detector": {
+    "pixel_threshold": 28,
+    "press_ratio": 0.14,
+    "release_ratio": 0.06,
+    "press_frames": 3,
+    "release_frames": 4,
+    "stable_ms": 180,
+    "candidate_timeout_ms": 350,
+    "adapt_rate": 0.003
+  },
+  "activation": {
+    "mode": "physical_confirm",
+    "dwell_ms": 900
+  },
+  "zones": [
+    {
+      "id": "zone_left",
+      "label": "ONE",
+      "rect": [0.06, 0.16, 0.47, 0.88],
+      "action": "action_one",
+      "color_bgr": [235, 170, 40]
+    },
+    {
+      "id": "zone_right",
+      "label": "TWO",
+      "rect": [0.53, 0.16, 0.94, 0.88],
+      "action": "action_two",
+      "color_bgr": [50, 70, 240]
+    }
+  ],
+  "inputs": {
+    "confirm_button": "confirm",
+    "calibrate_button": "calibrate",
+    "fallback_direct_buttons": {
+      "confirm": "zone_left",
+      "calibrate": "zone_right"
+    },
+    "movement": {
+      "enabled": false,
+      "impact_threshold_g": 1.5,
+      "fusion_window_ms": 150
+    }
+  }
+}

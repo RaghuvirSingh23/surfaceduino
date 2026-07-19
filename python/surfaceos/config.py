@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class CameraConfig:
+    source: str
+    resolution: tuple[int, int]
+    processing_resolution: tuple[int, int]
+    fps: int
+    codec: str
+    jpeg_quality: int
+
+
+@dataclass(frozen=True)
+class DetectorConfig:
+    pixel_threshold: int
+    press_ratio: float
+    release_ratio: float
+    press_frames: int
+    release_frames: int
+    stable_ms: int
+    candidate_timeout_ms: int
+    adapt_rate: float
+
+
+@dataclass(frozen=True)
+class ZoneConfig:
+    id: str
+    label: str
+    rect: tuple[float, float, float, float]
+    action: str
+    color_bgr: tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class SurfaceConfig:
+    camera: CameraConfig
+    detector: DetectorConfig
+    activation_mode: str
+    dwell_ms: int
+    zones: tuple[ZoneConfig, ...]
+    inputs: dict[str, Any]
+
+
+def _pair(value: list[int], name: str) -> tuple[int, int]:
+    if len(value) != 2 or any(int(item) <= 0 for item in value):
+        raise ValueError(f"{name} must contain two positive integers")
+    return int(value[0]), int(value[1])
+
+
+def load_config(path: str | Path) -> SurfaceConfig:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    camera = raw["camera"]
+    detector = raw["detector"]
+    activation = raw["activation"]
+
+    zones: list[ZoneConfig] = []
+    seen_ids: set[str] = set()
+    for item in raw["zones"]:
+        rect = tuple(float(value) for value in item["rect"])
+        if len(rect) != 4:
+            raise ValueError(f"Zone {item['id']} rect must have four values")
+        x0, y0, x1, y1 = rect
+        if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+            raise ValueError(f"Zone {item['id']} rect must be normalized and ordered")
+        if item["id"] in seen_ids:
+            raise ValueError(f"Duplicate zone id: {item['id']}")
+        seen_ids.add(item["id"])
+        zones.append(
+            ZoneConfig(
+                id=item["id"],
+                label=item.get("label", item["id"]),
+                rect=rect,
+                action=item.get("action", item["id"]),
+                color_bgr=tuple(int(value) for value in item.get("color_bgr", [255, 255, 255])),
+            )
+        )
+
+    if len(zones) != 2:
+        raise ValueError("The MVP expects exactly two camera zones")
+    if detector["release_ratio"] >= detector["press_ratio"]:
+        raise ValueError("release_ratio must be lower than press_ratio for hysteresis")
+
+    return SurfaceConfig(
+        camera=CameraConfig(
+            source=str(camera.get("source", "0")),
+            resolution=_pair(camera["resolution"], "camera.resolution"),
+            processing_resolution=_pair(camera["processing_resolution"], "camera.processing_resolution"),
+            fps=int(camera["fps"]),
+            codec=str(camera.get("codec", "MJPG")),
+            jpeg_quality=int(camera.get("jpeg_quality", 72)),
+        ),
+        detector=DetectorConfig(
+            pixel_threshold=int(detector["pixel_threshold"]),
+            press_ratio=float(detector["press_ratio"]),
+            release_ratio=float(detector["release_ratio"]),
+            press_frames=int(detector["press_frames"]),
+            release_frames=int(detector["release_frames"]),
+            stable_ms=int(detector["stable_ms"]),
+            candidate_timeout_ms=int(detector["candidate_timeout_ms"]),
+            adapt_rate=float(detector.get("adapt_rate", 0.0)),
+        ),
+        activation_mode=str(activation.get("mode", "physical_confirm")),
+        dwell_ms=int(activation.get("dwell_ms", 900)),
+        zones=tuple(zones),
+        inputs=dict(raw.get("inputs", {})),
+    )
