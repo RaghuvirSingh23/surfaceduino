@@ -38,6 +38,8 @@ class ZoneConfig:
     label: str
     rect: tuple[float, float, float, float]
     action: str
+    group: str
+    sound: str
     color_bgr: tuple[int, int, int]
 
 
@@ -81,12 +83,14 @@ def load_config(path: str | Path) -> SurfaceConfig:
                 label=item.get("label", item["id"]),
                 rect=rect,
                 action=item.get("action", item["id"]),
+                group=item.get("group", "control"),
+                sound=item.get("sound", item["id"]),
                 color_bgr=tuple(int(value) for value in item.get("color_bgr", [255, 255, 255])),
             )
         )
 
-    if len(zones) != 2:
-        raise ValueError("The MVP expects exactly two camera zones")
+    if not zones:
+        raise ValueError("At least one camera zone is required")
     if detector["release_ratio"] >= detector["press_ratio"]:
         raise ValueError("release_ratio must be lower than press_ratio for hysteresis")
 
@@ -97,6 +101,10 @@ def load_config(path: str | Path) -> SurfaceConfig:
     max_jpeg_bytes = int(camera.get("max_jpeg_bytes", 524288))
     if stale_after_ms <= 0 or max_jpeg_bytes <= 0:
         raise ValueError("camera stale timeout and JPEG size limit must be positive")
+
+    activation_mode = str(activation.get("mode", "physical_confirm"))
+    if activation_mode not in {"physical_confirm", "vision_press"}:
+        raise ValueError("activation.mode must be physical_confirm or vision_press")
 
     return SurfaceConfig(
         camera=CameraConfig(
@@ -121,7 +129,7 @@ def load_config(path: str | Path) -> SurfaceConfig:
             candidate_timeout_ms=int(detector["candidate_timeout_ms"]),
             adapt_rate=float(detector.get("adapt_rate", 0.0)),
         ),
-        activation_mode=str(activation.get("mode", "physical_confirm")),
+        activation_mode=activation_mode,
         dwell_ms=int(activation.get("dwell_ms", 900)),
         zones=tuple(zones),
         inputs=dict(raw.get("inputs", {})),

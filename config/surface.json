@@ -15,38 +15,114 @@
     "pixel_threshold": 28,
     "press_ratio": 0.14,
     "release_ratio": 0.06,
-    "press_frames": 3,
-    "release_frames": 4,
+    "press_frames": 1,
+    "release_frames": 2,
     "stable_ms": 180,
     "candidate_timeout_ms": 350,
-    "adapt_rate": 0.003
+    "adapt_rate": 0.001
   },
   "activation": {
-    "mode": "physical_confirm",
+    "mode": "vision_press",
     "dwell_ms": 900
   },
   "zones": [
     {
-      "id": "zone_left",
-      "label": "ONE",
-      "rect": [0.06, 0.16, 0.47, 0.88],
-      "action": "action_one",
+      "id": "piano_c4",
+      "label": "C4",
+      "rect": [0.04, 0.20, 0.125, 0.92],
+      "action": "note:C4",
+      "group": "piano",
+      "sound": "C4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "piano_d4",
+      "label": "D4",
+      "rect": [0.132, 0.20, 0.217, 0.92],
+      "action": "note:D4",
+      "group": "piano",
+      "sound": "D4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "piano_e4",
+      "label": "E4",
+      "rect": [0.224, 0.20, 0.309, 0.92],
+      "action": "note:E4",
+      "group": "piano",
+      "sound": "E4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "piano_f4",
+      "label": "F4",
+      "rect": [0.316, 0.20, 0.401, 0.92],
+      "action": "note:F4",
+      "group": "piano",
+      "sound": "F4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "piano_g4",
+      "label": "G4",
+      "rect": [0.408, 0.20, 0.493, 0.92],
+      "action": "note:G4",
+      "group": "piano",
+      "sound": "G4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "piano_a4",
+      "label": "A4",
+      "rect": [0.500, 0.20, 0.585, 0.92],
+      "action": "note:A4",
+      "group": "piano",
+      "sound": "A4",
+      "color_bgr": [245, 245, 245]
+    },
+    {
+      "id": "drum_kick",
+      "label": "KICK",
+      "rect": [0.64, 0.20, 0.795, 0.535],
+      "action": "drum:kick",
+      "group": "drum",
+      "sound": "kick",
       "color_bgr": [235, 170, 40]
     },
     {
-      "id": "zone_right",
-      "label": "TWO",
-      "rect": [0.53, 0.16, 0.94, 0.88],
-      "action": "action_two",
+      "id": "drum_snare",
+      "label": "SNARE",
+      "rect": [0.805, 0.20, 0.96, 0.535],
+      "action": "drum:snare",
+      "group": "drum",
+      "sound": "snare",
       "color_bgr": [50, 70, 240]
+    },
+    {
+      "id": "drum_hat",
+      "label": "HI-HAT",
+      "rect": [0.64, 0.56, 0.795, 0.92],
+      "action": "drum:hat",
+      "group": "drum",
+      "sound": "hat",
+      "color_bgr": [40, 220, 255]
+    },
+    {
+      "id": "drum_tom",
+      "label": "TOM",
+      "rect": [0.805, 0.56, 0.96, 0.92],
+      "action": "drum:tom",
+      "group": "drum",
+      "sound": "tom",
+      "color_bgr": [210, 80, 190]
     }
   ],
   "inputs": {
     "confirm_button": "confirm",
     "calibrate_button": "calibrate",
     "fallback_direct_buttons": {
-      "confirm": "zone_left",
-      "calibrate": "zone_right"
+      "confirm": "piano_c4",
+      "calibrate": "drum_kick"
     },
     "movement": {
       "enabled": false,
