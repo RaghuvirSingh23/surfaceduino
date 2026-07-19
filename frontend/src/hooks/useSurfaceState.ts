@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchState } from "@/lib/api";
+import { getEngineMode, subscribeEngineMode } from "@/lib/engine";
 import type { SurfaceState } from "@/types";
 
 const POLL_INTERVAL_MS = 80;
@@ -23,7 +24,15 @@ function normalize(raw: SurfaceState): SurfaceState {
 export function useSurfaceState() {
   const [state, setState] = useState<SurfaceState | null>(null);
   const [connected, setConnected] = useState(false);
+  const [engineMode, setEngineMode] = useState(getEngineMode);
   const timer = useRef<number | undefined>(undefined);
+
+  // Re-render (and restart the poll loop) whenever engine mode toggles.
+  useEffect(() => subscribeEngineMode(() => {
+    setState(null);
+    setConnected(false);
+    setEngineMode(getEngineMode());
+  }), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +59,7 @@ export function useSurfaceState() {
       controller.abort();
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, []);
+  }, [engineMode]); // restart loop when backend switches
 
   return { state, connected };
 }

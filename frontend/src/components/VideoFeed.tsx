@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Fingerprint, Hand, Maximize2, Minimize2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useEngineMode } from "@/hooks/useEngineMode";
 
 interface Props {
   fingertipCount: number;
@@ -11,6 +12,7 @@ interface Props {
 export function VideoFeed({ fingertipCount, handCount = 0 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { baseUrl } = useEngineMode();
 
   const toggleFullscreen = async () => {
     if (document.fullscreenElement) {
@@ -28,7 +30,8 @@ export function VideoFeed({ fingertipCount, handCount = 0 }: Props) {
       className="group relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-border bg-black"
     >
       <img
-        src="/stream"
+        key={baseUrl}
+        src={`${baseUrl}/stream`}
         alt="Live surface with fingertip tracking overlay"
         className="size-full object-contain"
       />

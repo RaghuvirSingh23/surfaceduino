@@ -1,24 +1,25 @@
+import { getBaseUrl } from "@/lib/engine";
 import type { AgentPresetsFile, AgentTileResult, SurfaceState } from "@/types";
 
 export async function fetchState(signal?: AbortSignal): Promise<SurfaceState> {
-  const response = await fetch("/state", { cache: "no-store", signal });
+  const response = await fetch(`${getBaseUrl()}/state`, { cache: "no-store", signal });
   if (!response.ok) throw new Error(`/state returned ${response.status}`);
   return (await response.json()) as SurfaceState;
 }
 
 export async function sendCommand(path: "/confirm" | "/calibrate"): Promise<void> {
-  const response = await fetch(path, { method: "POST" });
+  const response = await fetch(`${getBaseUrl()}${path}`, { method: "POST" });
   if (!response.ok) throw new Error(`${path} returned ${response.status}`);
 }
 
 export async function fetchAgentPresets(): Promise<AgentPresetsFile> {
-  const response = await fetch("/api/agent-presets", { cache: "no-store" });
+  const response = await fetch(`${getBaseUrl()}/api/agent-presets`, { cache: "no-store" });
   if (!response.ok) throw new Error(`/api/agent-presets returned ${response.status}`);
   return (await response.json()) as AgentPresetsFile;
 }
 
 export async function runAgentTile(presetId: string, tileId: string): Promise<AgentTileResult> {
-  const response = await fetch("/api/agent/run", {
+  const response = await fetch(`${getBaseUrl()}/api/agent/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ preset_id: presetId, tile_id: tileId }),
