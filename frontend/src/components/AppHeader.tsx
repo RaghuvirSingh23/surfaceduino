@@ -1,7 +1,8 @@
-import { Drum, Home, LayoutGrid, Music2, Volume2, VolumeX } from "lucide-react";
+import { Cpu, Drum, Home, LayoutGrid, Laptop, Music2, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusPills } from "@/components/StatusPills";
+import { useEngineMode } from "@/hooks/useEngineMode";
 import { cn } from "@/lib/utils";
 import type { Screen } from "@/App";
 import type { SurfaceState } from "@/types";
@@ -30,6 +31,8 @@ export function AppHeader({
   state,
   connected,
 }: Props) {
+  const { mode, isLocal, toggle } = useEngineMode();
+
   return (
     <header className="flex flex-col gap-4 border-b border-border/60 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -78,14 +81,45 @@ export function AppHeader({
           })}
         </nav>
 
-        <Button
-          variant={soundEnabled ? "outline" : "default"}
-          onClick={onEnableSound}
-          className={cn(soundEnabled && "border-success/50 text-[color:var(--success)]")}
-        >
-          {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-          {soundEnabled ? "Sound on" : "Enable sound"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Engine mode toggle */}
+          <button
+            type="button"
+            onClick={toggle}
+            title={isLocal ? "Running locally — click to switch to Arduino" : "Running on Arduino — click to switch to local Mac engine"}
+            className={cn(
+              "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all duration-200",
+              isLocal
+                ? "border-green-500/50 bg-green-500/10 text-green-400 hover:bg-green-500/15"
+                : "border-border bg-card/50 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            {isLocal ? (
+              <>
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-green-500" />
+                </span>
+                <Laptop className="size-3.5" />
+                Local
+              </>
+            ) : (
+              <>
+                <Cpu className="size-3.5" />
+                Arduino
+              </>
+            )}
+          </button>
+
+          <Button
+            variant={soundEnabled ? "outline" : "default"}
+            onClick={onEnableSound}
+            className={cn(soundEnabled && "border-success/50 text-[color:var(--success)]")}
+          >
+            {soundEnabled ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+            {soundEnabled ? "Sound on" : "Enable sound"}
+          </Button>
+        </div>
       </div>
     </header>
   );
