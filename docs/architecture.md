@@ -1,19 +1,20 @@
 # Architecture
 
-The application runs entirely on the two processors of one UNO Q:
+The Mac is a capture adapter; all interaction processing remains on the UNO Q:
 
 ```text
-Logitech C270
-      │ USB/V4L2
-      ▼
-Debian MPU: Camera → foreground detector → visual selection ─┐
-                                                            ├→ Fusion → surfaceos.event.v1
-STM32 MCU: D2/D3 → debounce → RouterBridge event ───────────┘
-      ▲                                                      │
-      └────────────── built-in RGB feedback RPC ─────────────┘
+Logitech C270 → Mac AVFoundation → JPEG POST → ADB tunnel ─────┐
+                                                               ▼
+UNO Q Debian: latest-frame inbox → decode → detector → selection ─┐
+                                                                 ├→ Fusion → surfaceos.event.v1
+UNO Q STM32: D2/D3 → debounce → RouterBridge event ──────────────┘
+      ▲                                                          │
+      └──────────────── built-in RGB feedback RPC ────────────────┘
 ```
 
-The laptop is only a development console. After App Lab deploys the project, camera processing, the web server and button handling continue on the UNO Q.
+The Mac never decides what a frame means. It opens video only, resizes to 640×480, JPEG-encodes at a fixed rate and sends frames. The UNO Q owns calibration, foreground detection, zone state, event sequencing, web rendering and physical feedback.
+
+The frame inbox is a single atomic slot shared by the WebUI thread and app loop. A new upload replaces an unprocessed older frame, so latency stays bounded even when the sender is faster than the detector. If valid decoded frames stop for 1.2 seconds, visual selection is cleared and the two buttons fall back to direct actions.
 
 ## Current interaction state machine
 

@@ -8,12 +8,16 @@ from typing import Any
 
 @dataclass(frozen=True)
 class CameraConfig:
+    transport: str
     source: str
     resolution: tuple[int, int]
     processing_resolution: tuple[int, int]
+    max_resolution: tuple[int, int]
     fps: int
     codec: str
     jpeg_quality: int
+    stale_after_ms: int
+    max_jpeg_bytes: int
 
 
 @dataclass(frozen=True)
@@ -86,14 +90,26 @@ def load_config(path: str | Path) -> SurfaceConfig:
     if detector["release_ratio"] >= detector["press_ratio"]:
         raise ValueError("release_ratio must be lower than press_ratio for hysteresis")
 
+    transport = str(camera.get("transport", "http_push"))
+    if transport not in {"http_push", "local_usb"}:
+        raise ValueError("camera.transport must be http_push or local_usb")
+    stale_after_ms = int(camera.get("stale_after_ms", 1200))
+    max_jpeg_bytes = int(camera.get("max_jpeg_bytes", 524288))
+    if stale_after_ms <= 0 or max_jpeg_bytes <= 0:
+        raise ValueError("camera stale timeout and JPEG size limit must be positive")
+
     return SurfaceConfig(
         camera=CameraConfig(
+            transport=transport,
             source=str(camera.get("source", "0")),
             resolution=_pair(camera["resolution"], "camera.resolution"),
             processing_resolution=_pair(camera["processing_resolution"], "camera.processing_resolution"),
+            max_resolution=_pair(camera.get("max_resolution", [1280, 720]), "camera.max_resolution"),
             fps=int(camera["fps"]),
             codec=str(camera.get("codec", "MJPG")),
             jpeg_quality=int(camera.get("jpeg_quality", 72)),
+            stale_after_ms=stale_after_ms,
+            max_jpeg_bytes=max_jpeg_bytes,
         ),
         detector=DetectorConfig(
             pixel_threshold=int(detector["pixel_threshold"]),

@@ -8,7 +8,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-from fastapi.responses import StreamingResponse
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_peripherals.camera import Camera
@@ -18,6 +19,7 @@ from surfaceos.config import SurfaceConfig, load_config
 from surfaceos.detector import BackgroundZoneDetector, DetectionSnapshot
 from surfaceos.events import InteractionEvent
 from surfaceos.fusion import FusionEngine
+from surfaceos.inputs.remote_frames import RemoteFrameInbox, decode_jpeg
 from surfaceos.renderer import render_overlay
 
 
@@ -115,9 +117,12 @@ store = RuntimeStore()
 commands: queue.SimpleQueue[tuple[str, str, bool, int]] = queue.SimpleQueue()
 detector = BackgroundZoneDetector(config.detector, config.zones, config.camera.processing_resolution)
 fusion = FusionEngine(config.detector.stable_ms, config.detector.candidate_timeout_ms)
+remote_inbox = RemoteFrameInbox(config.camera.max_jpeg_bytes)
 camera: Camera | None = None
 camera_retry_at_ms = 0
 last_camera_error: str | None = None
+vision_active = False
+last_good_remote_frame_ms: int | None = None
 CAMERA_RETRY_MS = 3_000
 
 
@@ -138,6 +143,43 @@ def enqueue_ui_command(control: str) -> dict[str, Any]:
 
 def state_api() -> dict[str, Any]:
     return store.snapshot()
+
+
+async def ingest_frame(request: Request) -> JSONResponse:
+    """Accept one Mac-captured JPEG and atomically replace any pending frame."""
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type != "image/jpeg":
+        raise HTTPException(status_code=415, detail="expected image/jpeg")
+
+    declared_length = request.headers.get("content-length")
+    if declared_length:
+        try:
+            if int(declared_length) > config.camera.max_jpeg_bytes:
+                raise HTTPException(status_code=413, detail="frame too large")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid content-length") from exc
+
+    payload = bytearray()
+    async for chunk in request.stream():
+        if len(payload) + len(chunk) > config.camera.max_jpeg_bytes:
+            raise HTTPException(status_code=413, detail="frame too large")
+        payload.extend(chunk)
+
+    try:
+        sequence, replaced = remote_inbox.put(
+            bytes(payload),
+            now_ms(),
+            source=request.headers.get("x-surfaceos-camera", "mac"),
+            host_sequence=request.headers.get("x-frame-seq"),
+        )
+    except ValueError as exc:
+        status_code = 413 if "too large" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+    return JSONResponse(
+        {"accepted": True, "sequence": sequence, "replaced": replaced},
+        status_code=202,
+    )
 
 
 def video_frames():
@@ -184,7 +226,7 @@ def process_commands(timestamp_ms: int) -> None:
         if not pressed:
             continue
 
-        if camera is None:
+        if not vision_active:
             direct_buttons = config.inputs.get("fallback_direct_buttons", {})
             control_id = direct_buttons.get(control)
             if control_id:
@@ -201,6 +243,7 @@ def process_commands(timestamp_ms: int) -> None:
 
 ui.expose_api("GET", "/state", state_api)
 ui.expose_api("GET", "/stream", video_stream)
+ui.expose_api("POST", "/ingest/frame", ingest_frame)
 ui.expose_api("POST", "/confirm", lambda: enqueue_ui_command("confirm"))
 ui.expose_api("POST", "/calibrate", lambda: enqueue_ui_command("calibrate"))
 
@@ -213,7 +256,7 @@ except RuntimeError as exc:
 
 
 def close_camera(reason: str) -> None:
-    global camera, camera_retry_at_ms
+    global camera, camera_retry_at_ms, vision_active
     active_camera = camera
     camera = None
     if active_camera is not None:
@@ -222,13 +265,16 @@ def close_camera(reason: str) -> None:
         except Exception as exc:
             logger.warning(f"Camera cleanup failed: {exc}")
     camera_retry_at_ms = now_ms() + CAMERA_RETRY_MS
+    vision_active = False
     store.set_camera_status("unavailable", {"reason": reason, "retry_ms": CAMERA_RETRY_MS})
     store.set_input_mode("direct_buttons")
 
 
 def connect_camera(timestamp_ms: int) -> None:
     """Connect the USB camera if present; otherwise leave both buttons useful."""
-    global camera, camera_retry_at_ms, last_camera_error
+    global camera, camera_retry_at_ms, last_camera_error, vision_active
+    if config.camera.transport != "local_usb":
+        return
     if camera is not None or timestamp_ms < camera_retry_at_ms:
         return
 
@@ -262,30 +308,12 @@ def connect_camera(timestamp_ms: int) -> None:
 
     camera = candidate
     last_camera_error = None
+    vision_active = True
     store.set_input_mode("vision_confirm")
     logger.info("USB camera connected; using vision + physical confirmation mode")
 
 
-def loop() -> None:
-    timestamp_ms = now_ms()
-    connect_camera(timestamp_ms)
-    if camera is None:
-        process_commands(timestamp_ms)
-        time.sleep(0.02)
-        return
-
-    try:
-        frame = camera.capture()
-    except Exception as exc:
-        logger.warning(f"USB camera disconnected; returning to direct mode: {exc}")
-        close_camera(str(exc))
-        process_commands(timestamp_ms)
-        return
-
-    if frame is None:
-        process_commands(timestamp_ms)
-        return
-
+def process_vision_frame(frame: Any, timestamp_ms: int) -> None:
     snapshot = detector.analyze(frame)
     fusion.update_selection(snapshot.candidate_id, snapshot.candidate_confidence, timestamp_ms)
     process_commands(timestamp_ms)
@@ -309,8 +337,109 @@ def loop() -> None:
     )
 
 
+def loop_remote_camera(timestamp_ms: int) -> None:
+    global vision_active, last_good_remote_frame_ms
+    packet = remote_inbox.take_latest()
+    if packet is not None:
+        try:
+            frame = decode_jpeg(packet.jpeg, config.camera.max_resolution)
+        except ValueError as exc:
+            remote_inbox.record_decode_error()
+            store.set_camera_status(
+                "decode_error",
+                {"transport": "http_push", "reason": str(exc), **remote_inbox.stats(timestamp_ms)},
+            )
+            process_commands(timestamp_ms)
+            return
+
+        if not vision_active:
+            fusion.clear_selection()
+            detector.request_calibration()
+            logger.info("Mac camera feed connected; calibrating remote surface")
+
+        vision_active = True
+        last_good_remote_frame_ms = timestamp_ms
+        store.set_input_mode("vision_confirm")
+        store.set_camera_status(
+            "streaming",
+            {
+                "transport": "http_push",
+                "source": packet.source,
+                "host_sequence": packet.host_sequence,
+                "frame_sequence": packet.sequence,
+                **remote_inbox.stats(timestamp_ms),
+            },
+        )
+        process_vision_frame(frame, timestamp_ms)
+        return
+
+    stats = remote_inbox.stats(timestamp_ms)
+    good_frame_age_ms = None
+    if last_good_remote_frame_ms is not None:
+        good_frame_age_ms = max(0, timestamp_ms - last_good_remote_frame_ms)
+
+    if vision_active and good_frame_age_ms is not None and good_frame_age_ms > config.camera.stale_after_ms:
+        vision_active = False
+        fusion.clear_selection()
+        store.set_input_mode("direct_buttons")
+        logger.warning("Mac camera feed stopped; using D2/D3 direct mode")
+
+    if not vision_active:
+        status = "waiting_for_mac" if last_good_remote_frame_ms is None else "stale"
+        store.set_camera_status(
+            status,
+            {
+                "transport": "http_push",
+                "endpoint": "/ingest/frame",
+                "frame_age_ms": good_frame_age_ms,
+                **stats,
+            },
+        )
+
+    process_commands(timestamp_ms)
+    time.sleep(0.008)
+
+
+def loop_local_camera(timestamp_ms: int) -> None:
+    connect_camera(timestamp_ms)
+    if camera is None:
+        process_commands(timestamp_ms)
+        time.sleep(0.02)
+        return
+
+    try:
+        frame = camera.capture()
+    except Exception as exc:
+        logger.warning(f"USB camera disconnected; returning to direct mode: {exc}")
+        close_camera(str(exc))
+        process_commands(timestamp_ms)
+        return
+
+    if frame is None:
+        process_commands(timestamp_ms)
+        return
+
+    process_vision_frame(frame, timestamp_ms)
+
+
+def loop() -> None:
+    timestamp_ms = now_ms()
+    if config.camera.transport == "http_push":
+        loop_remote_camera(timestamp_ms)
+    else:
+        loop_local_camera(timestamp_ms)
+
+
 logger.info(f"Starting SurfaceOS with config {CONFIG_PATH}")
-connect_camera(now_ms())
+if config.camera.transport == "http_push":
+    store.set_camera_status(
+        "waiting_for_mac",
+        {"transport": "http_push", "endpoint": "/ingest/frame"},
+    )
+    store.set_input_mode("direct_buttons")
+    logger.info("Waiting for Mac C270 feed on POST /ingest/frame")
+else:
+    connect_camera(now_ms())
 try:
     App.run(user_loop=loop)
 finally:

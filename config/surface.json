@@ -1,11 +1,15 @@
 {
   "camera": {
+    "transport": "http_push",
     "source": "0",
     "resolution": [640, 480],
     "processing_resolution": [320, 240],
+    "max_resolution": [1280, 720],
     "fps": 15,
     "codec": "MJPG",
-    "jpeg_quality": 72
+    "jpeg_quality": 72,
+    "stale_after_ms": 1200,
+    "max_jpeg_bytes": 524288
   },
   "detector": {
     "pixel_threshold": 28,

@@ -1,57 +1,39 @@
-# Connect the Logitech C270 to the UNO Q
+# Relay the Logitech C270 from the Mac
 
-## Required topology
-
-The camera connects to the **Linux processor through USB**, never to GPIO pins.
+The C270 remains plugged into the Mac. SurfaceOS opens only its video interface through OpenCV/AVFoundation; it never opens the built-in microphone.
 
 ```text
-                           ┌──────── Logitech C270 USB-A
-                           │
-5 V / 3 A USB-C supply ──> powered USB-C hub ──> UNO Q USB-C
-                           │
-                           └──────── optional keyboard/display during diagnosis
+C270 USB-A ──> Mac (capture + JPEG only)
+                    │
+                    └── http://127.0.0.1:17000/ingest/frame
+                                      │ ADB forward
+                                      ▼
+UNO Q USB-C <──────────────────── port 7000
 ```
 
-Use a hub with:
+## Start
 
-- a USB-A data port for the C270;
-- a USB-C PD input;
-- a USB-C upstream connection to the UNO Q.
-
-Arduino's official UNO Q camera example specifies an externally powered hub and 5 V / 3 A supply. See the [example](https://github.com/arduino/app-bricks-examples/tree/main/examples/platform_unoq/video-face-detection) and [UNO Q hardware documentation](https://docs.arduino.cc/hardware/uno-q).
-
-## Setup sequence
-
-1. Initially connect Mac/PC → UNO Q with the kit USB-C-to-C data cable.
-2. In Arduino App Lab, update the board, set its password, join Wi-Fi and note its hostname.
-3. Stop the current app and disconnect the data cable.
-4. Plug the C270 into the powered hub.
-5. Power the hub through its PD port with 5 V / 3 A.
-6. Connect the hub's upstream USB-C to the UNO Q.
-7. Wait for the UNO Q to finish booting.
-8. In App Lab select the board's **Network** target.
-
-The UNO Q must be the USB host. Do not connect the hub's upstream port to the development laptop.
-
-## Smoke test before SurfaceOS
-
-Run Arduino App Lab's **Face Detector on Camera** example. Only continue when its live image is stable. This validates:
-
-- USB role switching;
-- hub power delivery;
-- the C270 UVC video device;
-- App Lab's camera permissions.
-
-The C270 microphone may appear as a separate USB audio device. SurfaceOS never opens it and declares no audio Brick.
-
-## Board-side diagnosis
+With the UNO Q connected over its USB-C data cable and SurfaceOS running:
 
 ```bash
-lsusb
-ls -l /dev/video* /dev/v4l/by-id/*
-v4l2-ctl --list-devices
-v4l2-ctl -d /dev/video0 --list-formats-ext
-python3 scripts/probe_camera.py --device /dev/video0
+./scripts/run_mac_camera.sh
 ```
 
-Start with 640×480 MJPEG at 15 FPS on the 2 GB board. The detector downsizes frames to 320×240 internally.
+The launcher restores ADB forwarding from Mac port 17000 to board port 7000, finds the C270, captures 640×480 video at 12 FPS, JPEG-encodes it and sends frames sequentially. Sequential POSTs plus the board's one-frame inbox provide backpressure without an unbounded queue.
+
+Open the dashboard at `http://127.0.0.1:17000`.
+
+## Useful options
+
+```bash
+# Send ten frames and stop
+./scripts/run_mac_camera.sh --max-frames 10
+
+# Override camera index if macOS enumeration changes
+./scripts/run_mac_camera.sh --camera-index 1
+
+# Lower bandwidth
+./scripts/run_mac_camera.sh --fps 8 --jpeg-quality 60
+```
+
+By default the relay requires the C270's exact device ID, `0x1140000046d0825`, and refuses to substitute the FaceTime camera. `--camera-index` is an explicit manual override only. If the feed disappears, the UNO Q marks it stale after 1.2 seconds, clears the visual selection and returns D2/D3 to direct-button mode. A recovered feed automatically captures a fresh background.
