@@ -1,0 +1,226 @@
+{
+  "$schema": "./agent_presets.schema.json",
+  "active": "market_watch",
+  "presets": [
+    {
+      "version": "1",
+      "id": "market_watch",
+      "name": "Market Watch",
+      "description": "Live stocks, top tech news, and an AI market digest — tap any zone to refresh.",
+      "layout": { "cols": 3 },
+      "tiles": [
+        {
+          "id": "nvda",
+          "zone_id": "piano_c4",
+          "position": { "col": 1, "row": 1 },
+          "label": "NVDA",
+          "accent": "green",
+          "auto_refresh_s": 30,
+          "agent": {
+            "type": "stocks",
+            "config": {
+              "tickers": ["NVDA"],
+              "algo": "price_change",
+              "period": "1d"
+            }
+          }
+        },
+        {
+          "id": "tech_basket",
+          "zone_id": "piano_d4",
+          "position": { "col": 2, "row": 1 },
+          "label": "Tech Basket",
+          "accent": "blue",
+          "auto_refresh_s": 60,
+          "agent": {
+            "type": "stocks",
+            "config": {
+              "tickers": ["QQQ", "MSFT", "AAPL"],
+              "algo": "rsi_momentum",
+              "period": "5d"
+            }
+          }
+        },
+        {
+          "id": "clock",
+          "zone_id": "piano_e4",
+          "position": { "col": 3, "row": 1 },
+          "label": "Clock",
+          "accent": "default",
+          "agent": {
+            "type": "clock",
+            "config": {
+              "format": "24h",
+              "show_date": true,
+              "show_seconds": true
+            }
+          }
+        },
+        {
+          "id": "ai_digest",
+          "zone_id": "piano_f4",
+          "position": { "col": 1, "row": 2, "col_span": 2 },
+          "label": "AI Market Digest",
+          "accent": "purple",
+          "agent": {
+            "type": "ai_query",
+            "config": {
+              "prompt": "It's {date}. In exactly 2 sentences: one concrete insight about the AI/semiconductor market today, and one specific thing to watch. Be direct, no hedging.",
+              "model": "claude-haiku-4-5-20251001",
+              "max_tokens": 180
+            }
+          }
+        },
+        {
+          "id": "hn_top",
+          "zone_id": "piano_g4",
+          "position": { "col": 3, "row": 2 },
+          "label": "HN Top",
+          "accent": "amber",
+          "auto_refresh_s": 300,
+          "agent": {
+            "type": "news",
+            "config": {
+              "source": "hackernews",
+              "max_items": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "version": "1",
+      "id": "productivity",
+      "name": "Productivity",
+      "description": "Clock, AI daily brief, and a static note — minimal ambient display.",
+      "layout": { "cols": 2 },
+      "tiles": [
+        {
+          "id": "clock",
+          "zone_id": "piano_c4",
+          "position": { "col": 1, "row": 1 },
+          "label": "Time",
+          "accent": "default",
+          "agent": {
+            "type": "clock",
+            "config": {
+              "format": "24h",
+              "show_date": true,
+              "show_seconds": true
+            }
+          }
+        },
+        {
+          "id": "daily_brief",
+          "zone_id": "piano_d4",
+          "position": { "col": 2, "row": 1 },
+          "label": "Daily Brief",
+          "accent": "blue",
+          "agent": {
+            "type": "ai_query",
+            "config": {
+              "prompt": "Give me exactly 3 bullet points for a focused, productive day on {date}. Each bullet under 12 words. No intro.",
+              "model": "claude-haiku-4-5-20251001",
+              "max_tokens": 180
+            }
+          }
+        },
+        {
+          "id": "hn_news",
+          "zone_id": "piano_e4",
+          "position": { "col": 1, "row": 2 },
+          "label": "HN Top",
+          "accent": "amber",
+          "auto_refresh_s": 300,
+          "agent": {
+            "type": "news",
+            "config": {
+              "source": "hackernews",
+              "max_items": 5
+            }
+          }
+        },
+        {
+          "id": "reminder",
+          "zone_id": "piano_f4",
+          "position": { "col": 2, "row": 2 },
+          "label": "Note",
+          "accent": "cyan",
+          "agent": {
+            "type": "note",
+            "config": {
+              "text": "Tap a zone on the paper surface to refresh the tile bound to it.\n\nEdit config/agent_presets.json to change agents, add tiles, or switch presets."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "version": "1",
+      "id": "devops",
+      "name": "DevOps",
+      "description": "Custom metric endpoints + AI incident summary — wire up your own URLs.",
+      "layout": { "cols": 3 },
+      "tiles": [
+        {
+          "id": "clock",
+          "position": { "col": 3, "row": 1 },
+          "label": "Clock",
+          "accent": "default",
+          "agent": {
+            "type": "clock",
+            "config": { "format": "24h", "show_date": true, "show_seconds": false }
+          }
+        },
+        {
+          "id": "api_latency",
+          "zone_id": "piano_c4",
+          "position": { "col": 1, "row": 1 },
+          "label": "API Latency",
+          "accent": "green",
+          "auto_refresh_s": 15,
+          "agent": {
+            "type": "metric",
+            "config": {
+              "url": "http://localhost:9090/api/v1/query?query=histogram_quantile(0.99,rate(http_request_duration_seconds_bucket[5m]))",
+              "value_path": "data.result.0.value.1",
+              "unit": "ms",
+              "label_path": "status"
+            }
+          }
+        },
+        {
+          "id": "error_rate",
+          "zone_id": "piano_d4",
+          "position": { "col": 2, "row": 1 },
+          "label": "Error Rate",
+          "accent": "red",
+          "auto_refresh_s": 15,
+          "agent": {
+            "type": "metric",
+            "config": {
+              "url": "http://localhost:9090/api/v1/query?query=sum(rate(http_requests_total{status=~'5..'}[5m]))",
+              "value_path": "data.result.0.value.1",
+              "unit": "req/s"
+            }
+          }
+        },
+        {
+          "id": "incident_ai",
+          "zone_id": "piano_e4",
+          "position": { "col": 1, "row": 2, "col_span": 3 },
+          "label": "AI Incident Summary",
+          "accent": "purple",
+          "agent": {
+            "type": "ai_query",
+            "config": {
+              "prompt": "It's {time} on {date}. In 2 sentences, describe what a typical on-call engineer should check first if latency suddenly spikes in a microservices system. Be specific.",
+              "model": "claude-haiku-4-5-20251001",
+              "max_tokens": 200
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

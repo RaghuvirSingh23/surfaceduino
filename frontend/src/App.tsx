@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
+import { AgentConsoleScreen } from "@/screens/AgentConsoleScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { InstrumentScreen } from "@/screens/InstrumentScreen";
 import { useEventAudio } from "@/hooks/useEventAudio";
@@ -9,9 +10,9 @@ import { sendCommand } from "@/lib/api";
 import { audioEngine } from "@/lib/audio";
 import type { Zone } from "@/types";
 
-export type Screen = "home" | "piano" | "drums";
+export type Screen = "home" | "piano" | "drums" | "console";
 
-const SCREENS: Screen[] = ["home", "piano", "drums"];
+const SCREENS: Screen[] = ["home", "piano", "drums", "console"];
 
 function screenFromHash(): Screen {
   const hash = window.location.hash.replace("#/", "").replace("#", "");
@@ -83,6 +84,7 @@ export default function App() {
             onCalibrate={calibrate}
           />
         )}
+        {screen === "console" && <AgentConsoleScreen events={state?.events ?? []} />}
       </main>
 
       <footer className="mt-8 border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
