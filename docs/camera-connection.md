@@ -36,4 +36,4 @@ Open the dashboard at `http://127.0.0.1:17000`.
 ./scripts/run_mac_camera.sh --fps 8 --jpeg-quality 60
 ```
 
-By default the relay requires the C270's exact device ID, `0x1140000046d0825`, and refuses to substitute the FaceTime camera. `--camera-index` is an explicit manual override only. If the feed disappears, the UNO Q marks it stale after 1.2 seconds, clears the visual selection and returns D2/D3 to direct-button mode. A recovered feed automatically captures a fresh background.
+OpenCV's AVFoundation index order differs from the order reported by Apple's device-list API on this Mac. The verified OpenCV mapping is C270 index `0` and FaceTime index `1`; the launcher therefore defaults explicitly to index `0`. If the feed disappears, the UNO Q marks it stale after 1.2 seconds, clears the visual selection and returns D2/D3 to direct-button mode. A recovered feed automatically captures a fresh background.

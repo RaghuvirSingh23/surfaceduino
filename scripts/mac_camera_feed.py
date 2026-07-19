@@ -21,24 +21,6 @@ def request_stop(_signum: int, _frame: object) -> None:
     STOP_REQUESTED = True
 
 
-def resolve_camera_index(camera_name: str, camera_uid: str, override_index: int | None) -> int:
-    if override_index is not None:
-        return override_index
-    try:
-        from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
-
-        devices = list(AVCaptureDevice.devicesWithMediaType_(AVMediaTypeVideo))
-        for index, device in enumerate(devices):
-            if camera_uid and str(device.uniqueID()) == camera_uid:
-                return index
-        for index, device in enumerate(devices):
-            if camera_name.casefold() in str(device.localizedName()).casefold():
-                return index
-    except Exception as exc:
-        raise RuntimeError(f"could not enumerate macOS video devices: {exc}") from exc
-    raise RuntimeError(f"{camera_name!r} was not found; refusing to use another camera")
-
-
 def open_camera(index: int, width: int, height: int, fps: float) -> cv2.VideoCapture:
     camera = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
     if not camera.isOpened():
@@ -101,8 +83,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Push Logitech C270 frames from macOS to SurfaceOS")
     parser.add_argument("--url", default="http://127.0.0.1:17000/ingest/frame")
     parser.add_argument("--camera-name", default="C270")
-    parser.add_argument("--camera-uid", default="0x1140000046d0825")
-    parser.add_argument("--camera-index", type=int, default=None, help="explicit AVFoundation override")
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=0,
+        help="OpenCV AVFoundation index; 0 is the Logitech C270 on this Mac",
+    )
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=float, default=12.0)
@@ -120,7 +106,7 @@ def main() -> int:
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
 
-    camera_index = resolve_camera_index(args.camera_name, args.camera_uid, args.camera_index)
+    camera_index = args.camera_index
     client = FrameClient(args.url, args.timeout)
     sequence = 0
     accepted = 0
