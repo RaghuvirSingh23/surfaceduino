@@ -221,6 +221,73 @@
           }
         }
       ]
+    },
+    {
+      "version": "1",
+      "id": "dev_assistant",
+      "name": "Dev Assistant",
+      "description": "Codex-powered tiles — each zone runs a Codex agent task on tap.",
+      "layout": { "cols": 2 },
+      "tiles": [
+        {
+          "id": "clock",
+          "position": { "col": 1, "row": 1 },
+          "label": "Clock",
+          "accent": "default",
+          "agent": {
+            "type": "clock",
+            "config": { "format": "24h", "show_date": true, "show_seconds": false }
+          }
+        },
+        {
+          "id": "git_summary",
+          "zone_id": "piano_c4",
+          "position": { "col": 2, "row": 1 },
+          "label": "Git Status",
+          "accent": "green",
+          "agent": {
+            "type": "codex_cli",
+            "config": {
+              "prompt": "Run `git log --oneline -8` and `git status --short` in the current directory. Summarize what's changed in 3 bullet points. Be concise.",
+              "model": "o4-mini",
+              "sandbox": "read-only",
+              "timeout_s": 45
+            }
+          }
+        },
+        {
+          "id": "code_review",
+          "zone_id": "piano_d4",
+          "position": { "col": 1, "row": 2 },
+          "label": "Quick Review",
+          "accent": "blue",
+          "agent": {
+            "type": "codex_cli",
+            "config": {
+              "prompt": "Look at the most recently modified file in this repo. Give me: (1) what it does, (2) one potential bug or issue, (3) one improvement suggestion. 3 bullet points max.",
+              "model": "o4-mini",
+              "sandbox": "read-only",
+              "timeout_s": 60
+            }
+          }
+        },
+        {
+          "id": "todo_finder",
+          "zone_id": "piano_e4",
+          "position": { "col": 2, "row": 2 },
+          "label": "TODOs",
+          "accent": "amber",
+          "agent": {
+            "type": "codex_cli",
+            "config": {
+              "prompt": "Find all TODO, FIXME, and HACK comments in the source files of this repo. List them as bullet points with the file:line. If none, say so.",
+              "model": "o4-mini",
+              "sandbox": "read-only",
+              "timeout_s": 45
+            }
+          }
+        }
+      ]
     }
   ]
 }

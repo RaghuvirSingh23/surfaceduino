@@ -17,7 +17,8 @@ export type AgentConfig =
   | { type: "news"; config?: { source?: "hackernews" | "bbc_tech" | "techcrunch"; max_items?: number } }
   | { type: "stocks"; config: { tickers: string[]; algo?: string; period?: string } }
   | { type: "ai_query"; config: { prompt: string; system?: string; model?: string; max_tokens?: number } }
-  | { type: "metric"; config: { url: string; headers?: Record<string, string>; value_path?: string; label_path?: string; unit?: string } };
+  | { type: "metric"; config: { url: string; headers?: Record<string, string>; value_path?: string; label_path?: string; unit?: string } }
+  | { type: "codex_cli"; config: { prompt: string; model?: string; sandbox?: "read-only" | "workspace-write" | "danger-full-access"; writable_dir?: string; timeout_s?: number } };
 
 export interface AgentTileConfig {
   id: string;

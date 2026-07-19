@@ -97,7 +97,8 @@
         { "$ref": "#/$defs/NewsAgent" },
         { "$ref": "#/$defs/StocksAgent" },
         { "$ref": "#/$defs/AIQueryAgent" },
-        { "$ref": "#/$defs/MetricAgent" }
+        { "$ref": "#/$defs/MetricAgent" },
+        { "$ref": "#/$defs/CodexCLIAgent" }
       ]
     },
     "ClockAgent": {
@@ -266,6 +267,47 @@
             "unit": {
               "type": "string",
               "description": "Unit suffix displayed next to the value (e.g. 'ms', '%', 'req/s')."
+            }
+          }
+        }
+      }
+    },
+    "CodexCLIAgent": {
+      "type": "object",
+      "required": ["type", "config"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "codex_cli" },
+        "config": {
+          "type": "object",
+          "required": ["prompt"],
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {
+              "type": "string",
+              "description": "Instructions for the Codex agent. Supports {date} and {time} placeholders. The agent runs non-interactively via `codex exec`."
+            },
+            "model": {
+              "type": "string",
+              "default": "o4-mini",
+              "description": "OpenAI model for the Codex agent (e.g. o4-mini, o3, gpt-4o)."
+            },
+            "sandbox": {
+              "type": "string",
+              "enum": ["read-only", "workspace-write", "danger-full-access"],
+              "default": "read-only",
+              "description": "Codex sandbox policy controlling which shell commands the agent may run."
+            },
+            "writable_dir": {
+              "type": "string",
+              "description": "Additional directory the agent may write to (only relevant when sandbox is workspace-write)."
+            },
+            "timeout_s": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 300,
+              "default": 60,
+              "description": "Maximum wall-clock seconds to wait for the Codex agent to finish before returning an error."
             }
           }
         }

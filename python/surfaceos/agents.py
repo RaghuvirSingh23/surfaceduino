@@ -10,6 +10,9 @@ Result shapes:
   {"kind": "stocks",  "entries": [{"ticker", "price", "change_pct", "signal?"}]}
   {"kind": "metric",  "value": str | float, "unit": str, "label": str | None}
   {"kind": "error",   "message": str}
+
+codex_cli agent uses `codex exec` non-interactively; requires codex in PATH
+and a valid auth session (run `codex login` once).
 """
 from __future__ import annotations
 
@@ -38,6 +41,8 @@ def run_agent(agent_cfg: dict[str, Any]) -> dict[str, Any]:
             return _ai_query(cfg)
         if kind == "metric":
             return _metric(cfg)
+        if kind == "codex_cli":
+            return _codex_cli(cfg)
         return {"kind": "error", "message": f"Unknown agent type: {kind!r}"}
     except Exception as exc:
         return {"kind": "error", "message": str(exc)}
@@ -266,3 +271,80 @@ def _metric(cfg: dict[str, Any]) -> dict[str, Any]:
         "unit": cfg.get("unit", ""),
         "label": str(label) if label is not None else None,
     }
+
+
+def _codex_cli(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Run `codex exec` non-interactively and capture the agent's final message.
+
+    Requires:
+      - codex CLI in PATH  (npm i -g @openai/codex  or  brew install codex)
+      - Active auth session (`codex login` once)
+
+    The agent runs with --ephemeral so no session is persisted to disk.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    codex_path = shutil.which("codex")
+    if not codex_path:
+        return {
+            "kind": "error",
+            "message": "codex not found in PATH — install: npm i -g @openai/codex",
+        }
+
+    now = datetime.now()
+    prompt: str = cfg.get("prompt", "")
+    prompt = prompt.replace("{date}", now.strftime("%Y-%m-%d")).replace("{time}", now.strftime("%H:%M"))
+
+    model: str = cfg.get("model", "o4-mini")
+    sandbox: str = cfg.get("sandbox", "read-only")
+    timeout_s: int = int(cfg.get("timeout_s", 60))
+    writable_dir: str | None = cfg.get("writable_dir")
+
+    # Write last agent message to a temp file instead of parsing JSONL stream.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    cmd = [
+        codex_path, "exec",
+        "--ephemeral",
+        "--color", "never",
+        "--sandbox", sandbox,
+        "--output-last-message", tmp_path,
+        "--model", model,
+    ]
+    if writable_dir:
+        cmd += ["--add-dir", writable_dir]
+    cmd.append(prompt)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+
+        try:
+            with open(tmp_path, encoding="utf-8") as f:
+                text = f.read().strip()
+        except FileNotFoundError:
+            text = ""
+
+        if not text:
+            if proc.returncode != 0:
+                err = proc.stderr.strip() or proc.stdout.strip() or f"codex exited {proc.returncode}"
+                return {"kind": "error", "message": err}
+            text = proc.stdout.strip()
+
+        return {"kind": "text", "text": text}
+
+    except subprocess.TimeoutExpired:
+        return {"kind": "error", "message": f"codex timed out after {timeout_s}s"}
+    finally:
+        import os as _os
+        try:
+            _os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
